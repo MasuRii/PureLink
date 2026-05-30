@@ -1,0 +1,6 @@
+# Default repository ownership
+* @MasuRii
+
+# Keep release and CI metadata under explicit owner review
+/.github/ @MasuRii
+/.goreleaser.yml @MasuRii
