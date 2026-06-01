@@ -1,29 +1,30 @@
 package abuse
 
-// Reporter provides abuse reputation lookups.
+import "context"
+
+// Result contains legacy aggregate abuse reputation data.
+type Result struct {
+	Score      int      `json:"score"`
+	Reports    int      `json:"reports"`
+	Categories []string `json:"categories,omitempty"`
+	LastReport string   `json:"last_report,omitempty"`
+	Confidence float64  `json:"confidence"`
+}
+
+// Reporter provides a backward-compatible zero-network abuse lookup.
 type Reporter struct{}
 
-// Result contains abuse reputation data.
-type Result struct {
-	Score      int // 0-100, higher means more abusive
-	Reports    int // number of abuse reports
-	Categories []string
-	LastReport string
-	Confidence float64
-}
+func NewReporter() *Reporter { return &Reporter{} }
 
-// NewReporter creates a new abuse reporter.
-func NewReporter() *Reporter {
-	return &Reporter{}
-}
-
-// Check returns a mock abuse result for the given IP.
 func (r *Reporter) Check(ip string) (*Result, error) {
-	// Placeholder: integrate with AbuseIPDB, VirusTotal, etc.
-	return &Result{
-		Score:      0,
-		Reports:    0,
-		Categories: []string{},
-		Confidence: 1.0,
-	}, nil
+	return &Result{Score: 0, Reports: 0, Categories: []string{}, Confidence: 1.0}, nil
+}
+
+func (r *Reporter) CheckContext(ctx context.Context, ip string) (*ProviderResult, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		return &ProviderResult{Score: 0, Confidence: 1.0}, nil
+	}
 }
