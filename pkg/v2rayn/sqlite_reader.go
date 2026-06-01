@@ -20,11 +20,11 @@ func ReadProfiles(dbPath string) ([]ImportedEndpoint, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	subs := map[string]string{}
 	if rows, err := db.Query(`SELECT Id, Remarks, Enabled FROM SubItem WHERE Enabled = 1`); err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var id, remarks string
 			var enabled int
@@ -38,7 +38,7 @@ func ReadProfiles(dbPath string) ([]ImportedEndpoint, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read profiles: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []ImportedEndpoint
 	for rows.Next() {

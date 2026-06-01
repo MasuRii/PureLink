@@ -239,7 +239,7 @@ func TestRunReturnsErrNoTTYForFileInput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	_, err = Run(context.Background(), RunOptions{Snapshot: sampleSnapshot(), Input: f})
 	if err == nil {

@@ -63,7 +63,7 @@ func TestCheck_InvalidEndpoint(t *testing.T) {
 
 func TestCheck_ValidEndpoint(t *testing.T) {
 	l := startTCPListener(t)
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 	go func() {
 		for {
 			c, err := l.Accept()
@@ -88,7 +88,7 @@ func TestCheck_ValidEndpoint(t *testing.T) {
 
 func TestCheckEndpoint_DefaultTimeout(t *testing.T) {
 	l := startTCPListener(t)
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 	go func() {
 		for {
 			c, err := l.Accept()
@@ -109,7 +109,7 @@ func TestCheckEndpoint_DefaultTimeout(t *testing.T) {
 
 func TestCheckEndpoint_TCPReachable(t *testing.T) {
 	l := startTCPListener(t)
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 	go func() {
 		for {
 			c, err := l.Accept()
@@ -133,7 +133,7 @@ func TestCheckEndpoint_TCPReachable(t *testing.T) {
 
 func TestCheckEndpoint_TCPUnreachable(t *testing.T) {
 	l := startTCPListener(t)
-	l.Close() // immediately close
+	_ = l.Close() // immediately close
 	_, portStr, _ := net.SplitHostPort(l.Addr().String())
 	port, _ := strconv.Atoi(portStr)
 	ep := endpoint.Endpoint{Host: "127.0.0.1", Port: port}
@@ -182,7 +182,7 @@ func TestCheckEndpoint_TLS_FailureSelfSigned(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 	go func() {
 		for {
 			c, err := l.Accept()

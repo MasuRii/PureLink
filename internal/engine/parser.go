@@ -50,7 +50,7 @@ func ParseFile(path string) ([]SourceEndpoint, error) {
 		}
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return ParseReader(f, path)
 }
 

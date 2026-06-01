@@ -294,7 +294,7 @@ func (a *cliApp) renderImportOutput(path string, eps []v2rayn.ImportedEndpoint, 
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	r := output.New(a.cfg.Format, f)
 	r.NoColor = a.cfg.NoColor
 	return r.RenderImport(eps)

@@ -50,7 +50,7 @@ func hasSQLiteMagic(path string) bool {
 	if err != nil {
 		return false
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	buf := make([]byte, 16)
 	_, err = f.Read(buf)
 	return err == nil && bytes.Equal(buf, []byte("SQLite format 3\x00"))

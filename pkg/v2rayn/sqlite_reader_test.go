@@ -14,7 +14,7 @@ func TestReadProfilesSynthetic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	ddl := []string{
 		`CREATE TABLE ProfileItem (IndexId TEXT PRIMARY KEY, ConfigType INTEGER NOT NULL, Address TEXT NOT NULL, Port INTEGER NOT NULL, Remarks TEXT NOT NULL, Subid TEXT NOT NULL, Network TEXT NOT NULL, StreamSecurity TEXT, Password TEXT NOT NULL, Username TEXT NOT NULL, ProtoExtra TEXT, TransportExtra TEXT);`,
 		`CREATE TABLE SubItem (Id TEXT PRIMARY KEY, Remarks TEXT, Url TEXT NOT NULL, Enabled INTEGER NOT NULL DEFAULT 1);`,

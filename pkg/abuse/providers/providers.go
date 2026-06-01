@@ -52,7 +52,7 @@ func requestJSON(ctx context.Context, client *http.Client, method, endpoint stri
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	dec := json.NewDecoder(io.LimitReader(resp.Body, maxProviderBodyBytes))
 	if err := dec.Decode(out); err != nil {
@@ -66,7 +66,7 @@ func requestText(ctx context.Context, client *http.Client, endpoint string, prov
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	b, err := io.ReadAll(io.LimitReader(resp.Body, maxProviderBodyBytes))
 	if err != nil {
