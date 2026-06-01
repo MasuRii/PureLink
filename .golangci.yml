@@ -4,11 +4,18 @@ run:
 
 linters:
   enable:
+    - copyloopvar
     - errcheck
+    - gosimple
     - govet
     - ineffassign
+    - misspell
+    - nakedret
     - staticcheck
+    - unconvert
     - unused
+    - wastedassign
+    - whitespace
 
 issues:
   max-issues-per-linter: 0
