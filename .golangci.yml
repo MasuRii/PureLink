@@ -1,8 +1,9 @@
+version: "2"
 run:
   timeout: 5m
   tests: true
-
 linters:
+  default: none
   enable:
     - copyloopvar
     - errcheck
@@ -16,7 +17,6 @@ linters:
     - unused
     - wastedassign
     - whitespace
-
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
