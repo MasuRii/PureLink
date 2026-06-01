@@ -1,0 +1,21 @@
+{
+  "abuse_score": 10,
+  "dns_addrs": [
+    "93.184.216.34"
+  ],
+  "endpoint": "example.com:443",
+  "generated": "__TIMESTAMP__",
+  "host": "example.com",
+  "http_status": 200,
+  "latency_ms": 42,
+  "port": 443,
+  "providers": [
+    "ipapi.is"
+  ],
+  "purity": "clean",
+  "reachable": true,
+  "tls": {
+    "cipher": "TLS_AES_128_GCM_SHA256",
+    "version": "TLS1.3"
+  }
+}

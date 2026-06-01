@@ -1,0 +1,2 @@
+host,port,reachable,latency_ms,dns_addrs,tls_version,http_status,abuse_score,purity,providers
+example.com,443,true,42,93.184.216.34,TLS1.3,200,10,clean,ipapi.is

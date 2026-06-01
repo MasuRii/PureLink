@@ -1,0 +1,15 @@
+# PureLink Batch Report
+
+Generated: __TIMESTAMP__
+
+| Host | Port | Reachable | Latency | Abuse | Purity |
+|---|---:|---|---:|---:|---|
+| 192.0.2.1 | 443 | true | 12ms | 0 | clean |
+| 192.0.2.2 | 80 | false | 0ms | 75 | suspicious |
+
+## Summary
+
+- **Total**: 2
+- **Reachable**: 1
+- **Clean**: 1
+- **Suspicious**: 1

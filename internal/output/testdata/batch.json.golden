@@ -1,0 +1,35 @@
+{
+  "items": [
+    {
+      "endpoint": {
+        "host": "192.0.2.1",
+        "port": 443
+      },
+      "reachable": true,
+      "latency_ms": 12,
+      "abuse_score": 0,
+      "purity": "clean"
+    },
+    {
+      "endpoint": {
+        "host": "192.0.2.2",
+        "port": 80
+      },
+      "reachable": false,
+      "latency_ms": 0,
+      "abuse_score": 75,
+      "purity": "suspicious"
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "processed": 2,
+    "reachable": 1,
+    "unreachable": 1,
+    "abusive": 0,
+    "suspicious": 1,
+    "clean": 1,
+    "avg_latency_ms": 6,
+    "errors": 0
+  }
+}

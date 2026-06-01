@@ -1,0 +1,8 @@
+# PureLink Dedupe Report
+
+Unique Count: 1
+Total Count: 3
+
+| Endpoint | Count | Sources |
+|---|---:|---|
+| example.com:443 | 2 | list1.txt#3, list2.txt#7 |

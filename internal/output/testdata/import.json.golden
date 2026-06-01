@@ -1,0 +1,18 @@
+[
+  {
+    "protocol": "vmess",
+    "host": "192.0.2.10",
+    "port": 443,
+    "label": "US-East",
+    "sub_group": "Premium",
+    "source": "subs.json"
+  },
+  {
+    "protocol": "vless",
+    "host": "192.0.2.11",
+    "port": 8443,
+    "label": "EU-West",
+    "sub_group": "Basic",
+    "source": "subs.json"
+  }
+]

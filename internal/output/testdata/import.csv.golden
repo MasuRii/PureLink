@@ -1,0 +1,3 @@
+protocol,host,port,label,sub_group,source
+vmess,192.0.2.10,443,US-East,Premium,subs.json
+vless,192.0.2.11,8443,EU-West,Basic,subs.json

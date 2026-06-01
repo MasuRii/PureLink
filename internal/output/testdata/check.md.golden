@@ -1,0 +1,14 @@
+# PureLink Check Report
+
+Generated: __TIMESTAMP__
+
+| Host | Port | Reachable | Latency | Abuse | Purity |
+|---|---:|---|---:|---:|---|
+| example.com | 443 | true | 42ms | 10 | clean |
+
+## Summary
+
+- **Total**: 1
+- **Reachable**: 1
+- **Clean**: 1
+- **Suspicious**: 0

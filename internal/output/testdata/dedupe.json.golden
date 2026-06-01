@@ -1,0 +1,22 @@
+{
+  "unique": [
+    {
+      "host": "192.0.2.1",
+      "port": 443
+    }
+  ],
+  "collisions": {
+    "example.com:443": [
+      {
+        "file": "list1.txt",
+        "line": 3
+      },
+      {
+        "file": "list2.txt",
+        "line": 7
+      }
+    ]
+  },
+  "unique_count": 1,
+  "total_count": 3
+}

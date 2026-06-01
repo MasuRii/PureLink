@@ -1,0 +1,2 @@
+endpoint,count,sources
+example.com:443,2,"list1.txt#3, list2.txt#7"

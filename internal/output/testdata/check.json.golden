@@ -1,0 +1,37 @@
+{
+  "abuse": 10,
+  "check": {
+    "endpoint": {
+      "host": "example.com",
+      "port": 443,
+      "raw": "example.com:443"
+    },
+    "reachable": true,
+    "latency_ms": 42,
+    "tls_version": "TLS1.3",
+    "tls_cipher": "TLS_AES_128_GCM_SHA256",
+    "http_status": 200,
+    "dns_addrs": [
+      "93.184.216.34"
+    ]
+  },
+  "endpoint": "example.com:443",
+  "latency_ms": 42,
+  "providers": [
+    {
+      "provider": "ipapi.is",
+      "score": 10,
+      "confidence": 0.95,
+      "categories": [
+        "residential"
+      ],
+      "is_datacenter": false,
+      "is_vpn": false,
+      "is_proxy": false,
+      "is_tor": false,
+      "purity": "clean"
+    }
+  ],
+  "purity": "clean",
+  "reachable": true
+}
