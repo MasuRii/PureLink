@@ -24,6 +24,7 @@ var (
 
 func normalizeOutput(data []byte) []byte {
 	s := string(data)
+	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = timestampRegexMD.ReplaceAllString(s, "Generated: __TIMESTAMP__")
 	s = timestampRegexJSON.ReplaceAllString(s, `"generated": "__TIMESTAMP__"`)
 	return []byte(s)
