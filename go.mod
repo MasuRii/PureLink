@@ -1,6 +1,6 @@
 module github.com/MasuRii/PureLink
 
-go 1.24.2
+go 1.24.4
 
 require (
 	github.com/charmbracelet/bubbles v1.0.0

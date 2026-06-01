@@ -31,6 +31,4 @@ type ErrorMsg struct {
 	Err error
 }
 
-// quitMsg is an internal sentinel that the model uses to drive its own
-// shutdown path. External callers should send tea.Quit instead.
-type quitMsg struct{}
+

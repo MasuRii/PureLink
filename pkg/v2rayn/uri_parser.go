@@ -11,13 +11,9 @@ import (
 
 func ParseContent(content string) []ImportedEndpoint {
 	var out []ImportedEndpoint
-	for _, ep := range parseSIP008(content) {
-		out = append(out, ep)
-	}
+	out = append(out, parseSIP008(content)...)
 	if looksLikeWireGuardINI(content) {
-		for _, ep := range ParseWireGuardINI(content) {
-			out = append(out, ep)
-		}
+		out = append(out, ParseWireGuardINI(content)...)
 	}
 	s := bufio.NewScanner(strings.NewReader(content))
 	for s.Scan() {
