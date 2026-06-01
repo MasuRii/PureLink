@@ -30,5 +30,3 @@ type BatchCompleteMsg struct {
 type ErrorMsg struct {
 	Err error
 }
-
-

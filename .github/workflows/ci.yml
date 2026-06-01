@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24.4'
+          go-version: '1.25.10'
           cache: true
       - name: Check formatting
         run: |
@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24.4'
+          go-version: '1.25.10'
           cache: true
       - uses: golangci/golangci-lint-action@v6
         with:
@@ -50,7 +50,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24.4'
+          go-version: '1.25.10'
           cache: true
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24.4'
+          go-version: '1.25.10'
           cache: true
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
@@ -81,7 +81,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24.4'
+          go-version: '1.25.10'
           cache: true
       - name: Run unit tests with race detector (with coverage)
         if: matrix.os == 'ubuntu-latest'
@@ -90,6 +90,7 @@ jobs:
         if: matrix.os != 'ubuntu-latest'
         run: go test -v -race ./...
       - name: Benchmark smoke test
+        shell: bash
         run: go test -bench=. -benchtime=1x -run=^$ ./...
       - name: Coverage summary
         if: matrix.os == 'ubuntu-latest'
@@ -122,7 +123,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24.4'
+          go-version: '1.25.10'
           cache: true
       - name: Build with CGO_ENABLED=0
         run: CGO_ENABLED=0 go build -ldflags "-s -w" -o purelink-static ./cmd/purelink
@@ -146,7 +147,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24.4'
+          go-version: '1.25.10'
           cache: true
       - name: Build binary
         run: make build
