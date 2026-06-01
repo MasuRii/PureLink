@@ -40,7 +40,7 @@ jobs:
           cache: true
       - uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.0.2
+          version: v2.12.2
           args: --config=.golangci.yml
 
   vuln:
