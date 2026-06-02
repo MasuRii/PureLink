@@ -213,7 +213,11 @@ func (m BatchModel) renderTable() string {
 	b.WriteString("\n")
 
 	if len(m.visible) == 0 {
-		b.WriteString(m.theme.Mute.Render("(no results match the current filter)"))
+		message := "(no results match the current filter)"
+		if len(m.snapshot.Items) == 0 && m.snapshot.Summary.Total == 0 {
+			message = "(no endpoints loaded; run `purelink batch <file> --interactive` to inspect results)"
+		}
+		b.WriteString(m.theme.Mute.Render(message))
 		return m.theme.Border.Width(m.viewportWidth()).Render(b.String())
 	}
 

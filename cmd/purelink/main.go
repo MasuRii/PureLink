@@ -49,7 +49,7 @@ type cliApp struct {
 
 func newRootCommand(stdout, stderr io.Writer) *cobra.Command {
 	app := &cliApp{v: config.NewViper(), out: stdout, errOut: stderr}
-	root := &cobra.Command{Use: "purelink", Short: "Endpoint purity and abuse scanner", PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+	root := &cobra.Command{Use: "purelink", Short: "Endpoint purity and abuse scanner", Args: cobra.NoArgs, RunE: app.runDefaultTUI, PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if cmd.Name() == "help" {
 			return nil
 		}
@@ -84,6 +84,16 @@ func (a *cliApp) renderer() *output.Renderer {
 	r := output.New(a.cfg.Format, a.out)
 	r.NoColor = a.cfg.NoColor
 	return r
+}
+
+func (a *cliApp) runDefaultTUI(cmd *cobra.Command, _ []string) error {
+	_, err := runTUI(cmd.Context(), tui.RunOptions{
+		Snapshot:   tui.Snapshot{Source: "interactive"},
+		NoColor:    a.cfg.NoColor,
+		Output:     a.out,
+		AllowEmpty: true,
+	})
+	return err
 }
 
 func (a *cliApp) checkCommand() *cobra.Command {

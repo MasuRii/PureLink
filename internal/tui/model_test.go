@@ -263,6 +263,19 @@ func TestRunRejectsEmptySnapshot(t *testing.T) {
 	}
 }
 
+func TestRunAllowsEmptySnapshotWhenRequested(t *testing.T) {
+	bm, err := Run(context.Background(), RunOptions{Snapshot: Snapshot{Source: "interactive"}, Headless: true, AllowEmpty: true, NoColor: true})
+	if err != nil {
+		t.Fatalf("Run allowed empty snapshot returned error: %v", err)
+	}
+	if got := len(bm.Visible()); got != 0 {
+		t.Fatalf("empty model visible: want 0, got %d", got)
+	}
+	if !strings.Contains(bm.View(), "no endpoints loaded") {
+		t.Fatalf("empty default view missing guidance: %s", bm.View())
+	}
+}
+
 func TestLogHandlerBuffersAndRespectsLevel(t *testing.T) {
 	h := NewLogHandler(slog.LevelInfo)
 	logger := slog.New(h)

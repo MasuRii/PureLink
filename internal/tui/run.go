@@ -26,6 +26,9 @@ type RunOptions struct {
 	// Headless skips opening the alt screen and starting the program loop.
 	// Used by tests to verify model construction without a TTY.
 	Headless bool
+	// AllowEmpty permits launching the TUI without batch results. The default
+	// batch integration leaves this false so empty batch inputs still fail fast.
+	AllowEmpty bool
 }
 
 // ErrNoTTY is returned by Run when the program detects it is not connected to
@@ -38,7 +41,7 @@ var ErrNoTTY = errors.New("tui: no terminal attached; falling back to static out
 // the final BatchModel state, which callers can inspect for selections or
 // metrics.
 func Run(ctx context.Context, opts RunOptions) (BatchModel, error) {
-	if len(opts.Snapshot.Items) == 0 && opts.Snapshot.Summary.Total == 0 {
+	if !opts.AllowEmpty && len(opts.Snapshot.Items) == 0 && opts.Snapshot.Summary.Total == 0 {
 		return BatchModel{}, plerrors.ErrBatchEmpty
 	}
 

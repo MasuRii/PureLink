@@ -19,6 +19,33 @@ func execute(args ...string) (string, string, error) {
 	return out.String(), errOut.String(), err
 }
 
+func TestDefaultCommandLaunchesTUI(t *testing.T) {
+	oldRunTUI := runTUI
+	called := false
+	runTUI = func(ctx context.Context, opts tui.RunOptions) (tui.BatchModel, error) {
+		called = true
+		if opts.Snapshot.Source != "interactive" {
+			t.Fatalf("snapshot source=%q, want interactive", opts.Snapshot.Source)
+		}
+		if !opts.AllowEmpty {
+			t.Fatal("default TUI should allow an empty startup snapshot")
+		}
+		return tui.BatchModel{}, nil
+	}
+	defer func() { runTUI = oldRunTUI }()
+
+	out, errOut, err := execute()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !called {
+		t.Fatal("bare command did not call TUI runner")
+	}
+	if out != "" || errOut != "" {
+		t.Fatalf("default TUI should not render CLI output, out=%q err=%q", out, errOut)
+	}
+}
+
 func TestVersionCommand(t *testing.T) {
 	out, _, err := execute("version")
 	if err != nil {
@@ -29,12 +56,14 @@ func TestVersionCommand(t *testing.T) {
 	}
 }
 func TestHelpCommand(t *testing.T) {
-	out, _, err := execute("--help")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "check") || !strings.Contains(out, "batch") {
-		t.Fatalf("out=%q", out)
+	for _, args := range [][]string{{"--help"}, {"help"}} {
+		out, _, err := execute(args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(out, "check") || !strings.Contains(out, "batch") {
+			t.Fatalf("args=%v out=%q", args, out)
+		}
 	}
 }
 func TestImportLinkJSON(t *testing.T) {
