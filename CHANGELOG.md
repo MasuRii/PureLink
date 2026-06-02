@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Distribution
+
+- **Homebrew**: Added GoReleaser `homebrew_casks:` automation targeting `MasuRii/homebrew-tap`. Install: `brew install --cask MasuRii/tap/purelink`.
+- **Scoop**: Added GoReleaser `scoops:` automation targeting `MasuRii/scoop-bucket`. Install: `scoop bucket add MasuRii ... && scoop install purelink`.
+- **Docker / OCI Images**: Added `dockers_v2:` multi-arch image builds (linux/amd64 + linux/arm64) pushed to `ghcr.io/masurii/purelink`.
+- **WinGet**: Added GoReleaser `winget:` manifest generation with draft-PR automation to `microsoft/winget-pkgs`. Install: `winget install MasuRii.PureLink`. **Note:** `skip_upload: true` is set initially; change to `auto` when ready to publish.
+- **npm**: Added npm wrapper package under `npm/` with platform-aware `postinstall` binary download. Published via GitHub Actions with `NPM_TOKEN`. Install: `npm install -g purelink`.
+- **Maintainer Documentation**: Narrowed `docs/DISTRIBUTION.md` to the five implemented channels with required repository secrets and setup checklist.
+
+### Documentation
+
+- **Distribution Guide**: Added `docs/DISTRIBUTION.md` with package-manager and distribution channel recommendations across Windows, macOS, Linux, and cross-platform ecosystems (Homebrew, WinGet, Scoop, Chocolatey, npm, AUR, Docker, deb/rpm, Snap) with a prioritized rollout order.
+
+### Fixed
+
+- **Release CI**: Corrected Go version mismatch in release workflow (`1.24.2` → `1.25.10`) and added a pre-release verification gate (build + test) before GoReleaser execution.
+
 ### Added
 
 - **CLI Commands**: `check`, `batch`, `dedupe`, `report`, `import v2rayn`, `import link`, `version`, `configure`.

@@ -63,9 +63,46 @@ Download from the [releases page](https://github.com/MasuRii/PureLink/releases).
 | macOS | amd64, arm64 |
 | Windows | amd64, arm64 |
 
+### Homebrew (macOS & Linux)
+
+```bash
+brew install --cask MasuRii/tap/purelink
+```
+
+### Scoop (Windows)
+
+```powershell
+scoop bucket add MasuRii https://github.com/MasuRii/scoop-bucket.git
+scoop install purelink
+```
+
+### WinGet (Windows)
+
+```powershell
+winget install MasuRii.PureLink
+```
+
+### Docker
+
+```bash
+docker run --rm ghcr.io/masurii/purelink:latest --version
+docker run --rm ghcr.io/masurii/purelink:latest check 1.2.3.4
+```
+
+### npm
+
+```bash
+npm install -g purelink
+# Or run without installing:
+npx purelink --version
+```
+
 ## Quick Start
 
 ```bash
+# Launch the interactive TUI
+purelink
+
 # Check a single IP
 purelink check 159.89.194.243
 
@@ -104,6 +141,7 @@ purelink batch ./endpoints.txt --abuse --interactive
 
 | Command | Purpose |
 |---|---|
+| `purelink` | Launch the interactive TUI |
 | `check <endpoint>` | Validate a single endpoint (reachability, TLS, abuse, purity) |
 | `batch <file\|->` | Process endpoint lists with concurrency, sorting, and filtering |
 | `dedupe <file...>` | Detect duplicates across one or more endpoint list files |
@@ -201,7 +239,7 @@ All config keys can be set via `PURELINK_` prefixed environment variables:
 
 ## Interactive TUI
 
-When running `batch` with the `--interactive` flag, PureLink launches a terminal UI built with [Bubble Tea](https://github.com/charmbracelet/bubbletea):
+Running `purelink` without a subcommand launches the interactive terminal UI by default. When running `batch` with the `--interactive` flag, PureLink opens the same [Bubble Tea](https://github.com/charmbracelet/bubbletea)-powered UI after processing results:
 
 | Key | Action |
 |---|---|
