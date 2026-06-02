@@ -30,19 +30,52 @@ func TestIPAPIProviderCheck(t *testing.T) {
 }
 
 func TestIPLogsProviderCheck(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Fatalf("unexpected method %s", r.Method)
-		}
-		_, _ = w.Write([]byte(`{"verdict":"vpn_likely","score":61,"confidence":0.9,"signals":{"is_vpn":true,"matched_lists":["test"]}}`))
-	}))
-	defer srv.Close()
-	res, err := NewIPLogs(WithBaseURL(srv.URL)).Check(context.Background(), "192.0.2.1")
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name       string
+		body       string
+		wantScore  int
+		wantPurity string
+		wantIsVPN  bool
+	}{
+		{
+			name:       "integer score",
+			body:       `{"verdict":"vpn_likely","score":61,"confidence":0.9,"signals":{"is_vpn":true,"matched_lists":["test"]}}`,
+			wantScore:  61,
+			wantPurity: "vpn_likely",
+			wantIsVPN:  true,
+		},
+		{
+			name:       "float score 0-1 scale",
+			body:       `{"verdict":"suspicious","score":0.68,"confidence":0.75,"signals":{"is_vpn":false,"is_datacenter":true,"matched_lists":["dc"]}}`,
+			wantScore:  68,
+			wantPurity: "suspicious",
+			wantIsVPN:  false,
+		},
+		{
+			name:       "float score 0-100 scale",
+			body:       `{"verdict":"vpn_detected","score":85.0,"confidence":0.95,"signals":{"is_vpn":true,"matched_lists":["vpn"]}}`,
+			wantScore:  85,
+			wantPurity: "vpn_detected",
+			wantIsVPN:  true,
+		},
 	}
-	if res.Purity != "vpn_likely" || res.Score != 61 || !res.IsVPN {
-		t.Fatalf("got %+v", res)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPost {
+					t.Fatalf("unexpected method %s", r.Method)
+				}
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			defer srv.Close()
+			res, err := NewIPLogs(WithBaseURL(srv.URL)).Check(context.Background(), "192.0.2.1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.Purity != tt.wantPurity || res.Score != tt.wantScore || res.IsVPN != tt.wantIsVPN {
+				t.Fatalf("got %+v, want purity=%s score=%d isVPN=%v", res, tt.wantPurity, tt.wantScore, tt.wantIsVPN)
+			}
+		})
 	}
 }
 

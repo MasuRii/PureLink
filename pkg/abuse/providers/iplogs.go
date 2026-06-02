@@ -17,7 +17,7 @@ func (p *IPLogs) RateLimit() abuse.RateLimit { return abuse.RateLimit{RequestsPe
 func (p *IPLogs) Check(ctx context.Context, ip string) (*abuse.ProviderResult, error) {
 	var resp struct {
 		Verdict    string  `json:"verdict"`
-		Score      int     `json:"score"`
+		Score      float64 `json:"score"`
 		Confidence float64 `json:"confidence"`
 		Signals    struct {
 			IsVPN        bool     `json:"is_vpn"`
@@ -30,6 +30,10 @@ func (p *IPLogs) Check(ctx context.Context, ip string) (*abuse.ProviderResult, e
 	if err := requestJSON(ctx, p.cfg.client, "POST", p.cfg.baseURL, map[string]string{"ip": ip}, &resp, p.Name()); err != nil {
 		return nil, err
 	}
+	score := int(resp.Score)
+	if resp.Score >= 0 && resp.Score <= 1 {
+		score = int(resp.Score * 100)
+	}
 	cats := append([]string{}, resp.Signals.MatchedLists...)
-	return abuse.NormalizeResult(p.Name(), &abuse.ProviderResult{Score: resp.Score, Confidence: resp.Confidence, Categories: cats, IsDatacenter: resp.Signals.IsDatacenter, IsVPN: resp.Signals.IsVPN, IsProxy: resp.Signals.IsProxy, IsTor: resp.Signals.IsTor, Purity: resp.Verdict}), nil
+	return abuse.NormalizeResult(p.Name(), &abuse.ProviderResult{Score: score, Confidence: resp.Confidence, Categories: cats, IsDatacenter: resp.Signals.IsDatacenter, IsVPN: resp.Signals.IsVPN, IsProxy: resp.Signals.IsProxy, IsTor: resp.Signals.IsTor, Purity: resp.Verdict}), nil
 }
