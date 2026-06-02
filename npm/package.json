@@ -1,0 +1,46 @@
+{
+  "name": "purelink",
+  "version": "0.0.0-dev",
+  "description": "CLI toolkit for vetting endpoints, IPs, and domains — ensuring your connections are clean, unique, and abuse-free.",
+  "main": "index.js",
+  "bin": {
+    "purelink": "./bin/purelink"
+  },
+  "scripts": {
+    "postinstall": "node install.js",
+    "verify": "node -e \"require('./index.js').verify()\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MasuRii/PureLink.git"
+  },
+  "keywords": [
+    "cli",
+    "security",
+    "networking",
+    "endpoint",
+    "ip",
+    "domain",
+    "abuse",
+    "proxy",
+    "vpn"
+  ],
+  "author": "MasuRii",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/MasuRii/PureLink/issues"
+  },
+  "homepage": "https://github.com/MasuRii/PureLink#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
+}
