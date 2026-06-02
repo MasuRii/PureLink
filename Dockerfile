@@ -1,0 +1,4 @@
+FROM scratch
+ARG TARGETPLATFORM
+ENTRYPOINT ["/purelink"]
+COPY $TARGETPLATFORM/purelink /purelink
