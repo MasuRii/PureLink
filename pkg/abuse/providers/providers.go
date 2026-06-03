@@ -270,6 +270,15 @@ func intFromKeys(data map[string]interface{}, keys ...string) int {
 	return 0
 }
 
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
 func stringFromKeys(data map[string]interface{}, keys ...string) string {
 	for _, key := range keys {
 		if v, ok := data[key]; ok {

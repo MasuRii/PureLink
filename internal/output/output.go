@@ -39,10 +39,12 @@ func (r *Renderer) RenderCheck(check checker.CheckResult, providers []abuse.Prov
 		merged := abuse.Merge(providers)
 		item.AbuseScore = merged.Score
 		item.Purity = merged.Purity
+		item.Country = merged.Country
+		item.CountryCode = merged.CountryCode
 	}
 	switch r.Format {
 	case "json":
-		return writeJSON(r.Writer, map[string]interface{}{"endpoint": check.Endpoint.String(), "reachable": check.Reachable, "latency_ms": check.LatencyMs, "check": check, "providers": providers, "abuse": item.AbuseScore, "purity": item.Purity})
+		return writeJSON(r.Writer, map[string]interface{}{"endpoint": check.Endpoint.String(), "reachable": check.Reachable, "latency_ms": check.LatencyMs, "check": check, "providers": providers, "abuse": item.AbuseScore, "purity": item.Purity, "country": item.Country, "country_code": item.CountryCode})
 	case "csv":
 		return renderBatchCSV(r.Writer, []engine.BatchItem{item})
 	case "md":
@@ -104,14 +106,16 @@ func (r *Renderer) RenderReport(check checker.CheckResult, providers []abuse.Pro
 func reportPayload(check checker.CheckResult, providers []abuse.ProviderResult, verbose bool) map[string]interface{} {
 	merged := abuse.Merge(providers)
 	payload := map[string]interface{}{
-		"generated":   time.Now().UTC(),
-		"endpoint":    check.Endpoint.String(),
-		"host":        check.Endpoint.Host,
-		"port":        check.Endpoint.Port,
-		"reachable":   check.Reachable,
-		"latency_ms":  check.LatencyMs,
-		"abuse_score": merged.Score,
-		"purity":      merged.Purity,
+		"generated":    time.Now().UTC(),
+		"endpoint":     check.Endpoint.String(),
+		"host":         check.Endpoint.Host,
+		"port":         check.Endpoint.Port,
+		"reachable":    check.Reachable,
+		"latency_ms":   check.LatencyMs,
+		"abuse_score":  merged.Score,
+		"purity":       merged.Purity,
+		"country":      merged.Country,
+		"country_code": merged.CountryCode,
 	}
 	if len(check.DNSAddrs) > 0 {
 		payload["dns_addrs"] = check.DNSAddrs
@@ -134,8 +138,8 @@ func reportPayload(check checker.CheckResult, providers []abuse.ProviderResult, 
 func renderReportCSV(w io.Writer, check checker.CheckResult, providers []abuse.ProviderResult) error {
 	merged := abuse.Merge(providers)
 	cw := csv.NewWriter(w)
-	_ = cw.Write([]string{"host", "port", "reachable", "latency_ms", "dns_addrs", "tls_version", "http_status", "abuse_score", "purity", "providers"})
-	_ = cw.Write([]string{check.Endpoint.Host, strconv.Itoa(check.Endpoint.Port), strconv.FormatBool(check.Reachable), strconv.FormatInt(check.LatencyMs, 10), strings.Join(check.DNSAddrs, ";"), check.TLSVersion, strconv.Itoa(check.HTTPStatus), strconv.Itoa(merged.Score), merged.Purity, strings.Join(providerNames(providers), ";")})
+	_ = cw.Write([]string{"host", "port", "country", "country_code", "reachable", "latency_ms", "dns_addrs", "tls_version", "http_status", "abuse_score", "purity", "providers"})
+	_ = cw.Write([]string{check.Endpoint.Host, strconv.Itoa(check.Endpoint.Port), merged.Country, merged.CountryCode, strconv.FormatBool(check.Reachable), strconv.FormatInt(check.LatencyMs, 10), strings.Join(check.DNSAddrs, ";"), check.TLSVersion, strconv.Itoa(check.HTTPStatus), strconv.Itoa(merged.Score), merged.Purity, strings.Join(providerNames(providers), ";")})
 	cw.Flush()
 	return cw.Error()
 }
@@ -183,6 +187,7 @@ func renderReportTable(w io.Writer, check checker.CheckResult, providers []abuse
 	fmt.Fprintf(w, "\nAbuse / Purity\n%s\n", line)
 	fmt.Fprintf(w, "Score:     %d / 100\n", merged.Score)
 	fmt.Fprintf(w, "Verdict:   %s\n", displayValue(merged.Purity))
+	fmt.Fprintf(w, "Region:    %s\n", displayCountry(merged.Country, merged.CountryCode))
 	fmt.Fprintf(w, "Providers: %s\n", displayList(providerNames(providers)))
 	if verbose {
 		for _, p := range providers {
@@ -201,7 +206,7 @@ func renderReportMD(w io.Writer, check checker.CheckResult, providers []abuse.Pr
 	}
 	fmt.Fprintf(w, "\n## DNS\n\n- **A/AAAA**: %s\n- **CNAME**: —\n", displayList(check.DNSAddrs))
 	fmt.Fprintf(w, "\n## Reachability\n\n- **TCP**: %t (%dms)\n- **TLS**: %s\n- **HTTP**: %s\n", check.Reachable, check.LatencyMs, displayValue(check.TLSVersion), displayHTTPStatus(check.HTTPStatus))
-	fmt.Fprintf(w, "\n## Abuse / Purity\n\n- **Score**: %d / 100\n- **Verdict**: %s\n- **Providers**: %s\n", merged.Score, displayValue(merged.Purity), displayList(providerNames(providers)))
+	fmt.Fprintf(w, "\n## Abuse / Purity\n\n- **Score**: %d / 100\n- **Verdict**: %s\n- **Region**: %s\n- **Providers**: %s\n", merged.Score, displayValue(merged.Purity), displayCountry(merged.Country, merged.CountryCode), displayList(providerNames(providers)))
 	if verbose && len(providers) > 0 {
 		fmt.Fprint(w, "\n### Provider Signals\n\n")
 		for _, p := range providers {
@@ -238,6 +243,9 @@ func formatProviderSignals(p abuse.ProviderResult) string {
 	if p.Purity != "" {
 		parts = append(parts, "purity="+p.Purity)
 	}
+	if region := displayCountry(p.Country, p.CountryCode); region != "—" {
+		parts = append(parts, "region="+region)
+	}
 	if len(p.Categories) > 0 {
 		parts = append(parts, "categories="+strings.Join(p.Categories, ","))
 	}
@@ -258,11 +266,36 @@ func displayValue(value string) string {
 	return value
 }
 
+func displayText(value string) string {
+	return displayValue(value)
+}
+
+func displayCountry(country, countryCode string) string {
+	if country != "" {
+		return country
+	}
+	if countryCode != "" {
+		return countryCode
+	}
+	return "—"
+}
+
+func displayRegion(item engine.BatchItem) string {
+	return displayCountry(item.Country, item.CountryCode)
+}
+
 func displayHTTPStatus(status int) string {
 	if status == 0 {
 		return "—"
 	}
 	return strconv.Itoa(status)
+}
+
+func displayAbuseScore(item engine.BatchItem) string {
+	if item.AbuseScore == 0 && item.Purity == "unknown" {
+		return "—"
+	}
+	return strconv.Itoa(item.AbuseScore)
 }
 
 func writeJSON(w io.Writer, v interface{}) error {
@@ -273,32 +306,69 @@ func writeJSON(w io.Writer, v interface{}) error {
 
 func renderBatchCSV(w io.Writer, items []engine.BatchItem) error {
 	cw := csv.NewWriter(w)
-	_ = cw.Write([]string{"host", "port", "reachable", "latency_ms", "abuse_score", "purity"})
+	_ = cw.Write([]string{"host", "port", "protocol", "country", "country_code", "reachable", "latency_ms", "abuse_score", "purity"})
 	for _, item := range items {
-		_ = cw.Write([]string{item.Endpoint.Host, strconv.Itoa(item.Endpoint.Port), strconv.FormatBool(item.Reachable), strconv.FormatInt(item.LatencyMs, 10), strconv.Itoa(item.AbuseScore), item.Purity})
+		_ = cw.Write([]string{item.Endpoint.Host, strconv.Itoa(item.Endpoint.Port), item.Protocol, item.Country, item.CountryCode, strconv.FormatBool(item.Reachable), strconv.FormatInt(item.LatencyMs, 10), displayAbuseScore(item), item.Purity})
 	}
 	cw.Flush()
 	return cw.Error()
 }
 func renderBatchTable(w io.Writer, items []engine.BatchItem, s engine.BatchSummary, noColor bool) error {
-	fmt.Fprintln(w, "Host                Port  Reachable  Latency  Abuse  Purity")
-	if noColor {
-		fmt.Fprintln(w, "------------------------------------------------------------")
-	} else {
-		fmt.Fprintln(w, "────────────────────────────────────────────────────────────")
+	headers := []string{"Host", "Port", "Protocol", "Region", "Reachable", "Latency", "Abuse Score", "Purity"}
+	widths := make([]int, len(headers))
+	for i, header := range headers {
+		widths[i] = len(header)
 	}
+	rows := make([][]string, 0, len(items))
 	for _, item := range items {
-		fmt.Fprintf(w, "%-19s %-5d %-10t %-8s %-6d %s\n", truncate(item.Endpoint.Host, 19), item.Endpoint.Port, item.Reachable, fmt.Sprintf("%dms", item.LatencyMs), item.AbuseScore, item.Purity)
+		row := []string{item.Endpoint.Host, strconv.Itoa(item.Endpoint.Port), displayText(item.Protocol), displayRegion(item), strconv.FormatBool(item.Reachable), fmt.Sprintf("%dms", item.LatencyMs), displayAbuseScore(item), item.Purity}
+		rows = append(rows, row)
+		for i, cell := range row {
+			if len(cell) > widths[i] {
+				widths[i] = len(cell)
+			}
+		}
 	}
-	fmt.Fprintf(w, "\nSummary\n  Total:       %d\n  Reachable:   %d\n  Unreachable: %d\n  Clean:       %d\n  Suspicious:  %d\n  Avg Latency: %dms\n  Errors:      %d\n", s.Total, s.Reachable, s.Unreachable, s.Clean, s.Suspicious, s.AvgLatency, s.Errors)
+	writeAlignedRow(w, headers, widths)
+	lineWidth := 0
+	for _, width := range widths {
+		lineWidth += width
+	}
+	lineWidth += len(widths) - 1
+	if noColor {
+		fmt.Fprintln(w, strings.Repeat("-", lineWidth))
+	} else {
+		fmt.Fprintln(w, strings.Repeat("─", lineWidth))
+	}
+	for _, row := range rows {
+		writeAlignedRow(w, row, widths)
+	}
+	fmt.Fprintf(w, "\nSummary\n  Total:       %d\n  Reachable:   %d\n  Unreachable: %d\n  Clean:       %d\n  Suspicious:  %d\n  Avg Latency: %dms\n", s.Total, s.Reachable, s.Unreachable, s.Clean, s.Suspicious, s.AvgLatency)
+	if s.SpeedMbps > 0 {
+		fmt.Fprintf(w, "  Speed:       %.2f Mbps\n", s.SpeedMbps)
+	}
+	fmt.Fprintf(w, "  Errors:      %d\n", s.Errors)
 	return nil
 }
+func writeAlignedRow(w io.Writer, cells []string, widths []int) {
+	for i, cell := range cells {
+		if i > 0 {
+			fmt.Fprint(w, " ")
+		}
+		fmt.Fprintf(w, "%-*s", widths[i], cell)
+	}
+	fmt.Fprintln(w)
+}
+
 func renderBatchMD(w io.Writer, items []engine.BatchItem, s engine.BatchSummary, title string) error {
-	fmt.Fprintf(w, "# %s\n\nGenerated: %s\n\n| Host | Port | Reachable | Latency | Abuse | Purity |\n|---|---:|---|---:|---:|---|\n", title, time.Now().UTC().Format(time.RFC3339))
+	fmt.Fprintf(w, "# %s\n\nGenerated: %s\n\n| Host | Port | Protocol | Region | Reachable | Latency | Abuse Score | Purity |\n|---|---:|---|---|---|---:|---:|---|\n", title, time.Now().UTC().Format(time.RFC3339))
 	for _, item := range items {
-		fmt.Fprintf(w, "| %s | %d | %t | %dms | %d | %s |\n", item.Endpoint.Host, item.Endpoint.Port, item.Reachable, item.LatencyMs, item.AbuseScore, item.Purity)
+		fmt.Fprintf(w, "| %s | %d | %s | %s | %t | %dms | %s | %s |\n", item.Endpoint.Host, item.Endpoint.Port, displayText(item.Protocol), displayRegion(item), item.Reachable, item.LatencyMs, displayAbuseScore(item), item.Purity)
 	}
 	fmt.Fprintf(w, "\n## Summary\n\n- **Total**: %d\n- **Reachable**: %d\n- **Clean**: %d\n- **Suspicious**: %d\n", s.Total, s.Reachable, s.Clean, s.Suspicious)
+	if s.SpeedMbps > 0 {
+		fmt.Fprintf(w, "- **Speed**: %.2f Mbps\n", s.SpeedMbps)
+	}
 	return nil
 }
 

@@ -16,11 +16,18 @@ func (p *IPAPI) RateLimit() abuse.RateLimit { return abuse.RateLimit{RequestsPer
 
 func (p *IPAPI) Check(ctx context.Context, ip string) (*abuse.ProviderResult, error) {
 	var resp struct {
-		IsVPN        bool `json:"is_vpn"`
-		IsProxy      bool `json:"is_proxy"`
-		IsTor        bool `json:"is_tor"`
-		IsDatacenter bool `json:"is_datacenter"`
-		Company      struct {
+		IsVPN        bool   `json:"is_vpn"`
+		IsProxy      bool   `json:"is_proxy"`
+		IsTor        bool   `json:"is_tor"`
+		IsDatacenter bool   `json:"is_datacenter"`
+		Country      string `json:"country"`
+		CountryName  string `json:"country_name"`
+		CountryCode  string `json:"country_code"`
+		Location     struct {
+			Country     string `json:"country"`
+			CountryCode string `json:"country_code"`
+		} `json:"location"`
+		Company struct {
 			Type string `json:"type"`
 		} `json:"company"`
 		Abuse struct {
@@ -45,5 +52,7 @@ func (p *IPAPI) Check(ctx context.Context, ip string) (*abuse.ProviderResult, er
 	if resp.IsTor {
 		cats = append(cats, "tor")
 	}
-	return abuse.NormalizeResult(p.Name(), &abuse.ProviderResult{Score: resp.Abuse.Score, Confidence: 0.8, Categories: cats, IsDatacenter: resp.IsDatacenter || resp.Company.Type == "hosting", IsVPN: resp.IsVPN, IsProxy: resp.IsProxy, IsTor: resp.IsTor}), nil
+	country := firstNonEmpty(resp.CountryName, resp.Country, resp.Location.Country)
+	countryCode := firstNonEmpty(resp.CountryCode, resp.Location.CountryCode)
+	return abuse.NormalizeResult(p.Name(), &abuse.ProviderResult{Score: resp.Abuse.Score, Confidence: 0.8, Categories: cats, IsDatacenter: resp.IsDatacenter || resp.Company.Type == "hosting", IsVPN: resp.IsVPN, IsProxy: resp.IsProxy, IsTor: resp.IsTor, Country: country, CountryCode: countryCode}), nil
 }

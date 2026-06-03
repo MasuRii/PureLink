@@ -45,11 +45,13 @@ func (p *IPLookup) Check(ctx context.Context, ip string) (*abuse.ProviderResult,
 	}
 
 	raw := map[string]interface{}{}
-	for _, key := range []string{"country", "asn", "as", "isp", "reverse_dns"} {
+	for _, key := range []string{"country", "country_code", "countryCode", "asn", "as", "isp", "reverse_dns"} {
 		if value := stringFromKeys(resp, key); value != "" {
 			raw[key] = value
 		}
 	}
+	country := stringFromKeys(resp, "country", "country_name")
+	countryCode := stringFromKeys(resp, "country_code", "countryCode")
 
-	return abuse.NormalizeResult(p.Name(), &abuse.ProviderResult{Score: score, Confidence: 0.55, Categories: categories(isVPN, isProxy, isTor, isHosting), IsDatacenter: isHosting, IsVPN: isVPN, IsProxy: isProxy, IsTor: isTor, Raw: raw}), nil
+	return abuse.NormalizeResult(p.Name(), &abuse.ProviderResult{Score: score, Confidence: 0.55, Categories: categories(isVPN, isProxy, isTor, isHosting), IsDatacenter: isHosting, IsVPN: isVPN, IsProxy: isProxy, IsTor: isTor, Country: country, CountryCode: countryCode, Raw: raw}), nil
 }

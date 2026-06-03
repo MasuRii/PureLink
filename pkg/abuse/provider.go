@@ -3,6 +3,7 @@ package abuse
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 type Provider interface {
@@ -21,6 +22,8 @@ type ProviderResult struct {
 	IsProxy      bool                   `json:"is_proxy"`
 	IsTor        bool                   `json:"is_tor"`
 	Purity       string                 `json:"purity,omitempty"`
+	Country      string                 `json:"country,omitempty"`
+	CountryCode  string                 `json:"country_code,omitempty"`
 	Raw          map[string]interface{} `json:"raw,omitempty"`
 }
 
@@ -73,6 +76,8 @@ func NormalizeResult(provider string, r *ProviderResult) *ProviderResult {
 	if r.Confidence > 1 {
 		r.Confidence = 1
 	}
+	r.Country = strings.TrimSpace(r.Country)
+	r.CountryCode = strings.ToUpper(strings.TrimSpace(r.CountryCode))
 	if r.Purity == "" {
 		r.Purity = PurityFromSignals(r)
 	}
@@ -97,7 +102,12 @@ func PurityFromSignals(r *ProviderResult) string {
 
 func Merge(results []ProviderResult) ProviderResult {
 	merged := ProviderResult{Confidence: 0, Purity: "unknown", Raw: map[string]interface{}{}}
+	if len(results) == 0 {
+		return merged
+	}
+
 	seen := map[string]struct{}{}
+	bestPurityRank := purityRiskRank(merged.Purity)
 	for i := range results {
 		r := NormalizeResult(results[i].Provider, &results[i])
 		if r.Score > merged.Score {
@@ -110,18 +120,42 @@ func Merge(results []ProviderResult) ProviderResult {
 		merged.IsVPN = merged.IsVPN || r.IsVPN
 		merged.IsProxy = merged.IsProxy || r.IsProxy
 		merged.IsTor = merged.IsTor || r.IsTor
+		if merged.Country == "" && r.Country != "" {
+			merged.Country = r.Country
+		}
+		if merged.CountryCode == "" && r.CountryCode != "" {
+			merged.CountryCode = r.CountryCode
+		}
 		for _, c := range r.Categories {
 			if _, ok := seen[c]; !ok {
 				merged.Categories = append(merged.Categories, c)
 				seen[c] = struct{}{}
 			}
 		}
-		if r.Purity != "" && r.Purity != "unknown" {
-			merged.Purity = r.Purity
+		if r.Purity != "" {
+			if rank := purityRiskRank(r.Purity); rank > bestPurityRank {
+				merged.Purity = r.Purity
+				bestPurityRank = rank
+			}
 		}
 	}
 	if merged.Purity == "unknown" {
 		merged.Purity = PurityFromSignals(&merged)
 	}
 	return merged
+}
+
+func purityRiskRank(purity string) int {
+	switch purity {
+	case "vpn_detected":
+		return 5
+	case "vpn_likely":
+		return 4
+	case "suspicious":
+		return 3
+	case "clean":
+		return 1
+	default:
+		return 0
+	}
 }

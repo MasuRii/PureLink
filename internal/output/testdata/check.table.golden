@@ -1,6 +1,6 @@
-Host                Port  Reachable  Latency  Abuse  Purity
-────────────────────────────────────────────────────────────
-example.com         443   true       42ms     10     clean
+Host        Port Protocol Region Reachable Latency Abuse Score Purity
+─────────────────────────────────────────────────────────────────────
+example.com 443  —        —      true      42ms    10          clean 
 
 Summary
   Total:       1

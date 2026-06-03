@@ -1,2 +1,2 @@
-host,port,reachable,latency_ms,abuse_score,purity
-example.com,443,true,42,10,clean
+host,port,protocol,country,country_code,reachable,latency_ms,abuse_score,purity
+example.com,443,,,,true,42,10,clean

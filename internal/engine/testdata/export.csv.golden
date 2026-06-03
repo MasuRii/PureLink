@@ -1,0 +1,4 @@
+protocol,host,port,country,country_code,abuse_score,purity
+vless,192.0.2.10,443,United States,US,0,clean
+trojan,198.51.100.20,8080,Germany,DE,65,suspicious
+vmess,vpn.example,8443,,SG,72,vpn_detected

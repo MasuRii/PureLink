@@ -1,0 +1,7 @@
+PureLink Export Summary
+Grouped by: protocol
+Total endpoints: 3
+
+- trojan: 1 endpoints -> PureLink-protocol-trojan.txt
+- vless: 1 endpoints -> PureLink-protocol-vless.txt
+- vmess: 1 endpoints -> PureLink-protocol-vmess.txt

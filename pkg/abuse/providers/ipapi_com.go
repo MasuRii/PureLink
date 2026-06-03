@@ -20,14 +20,15 @@ func (p *IPAPICom) RateLimit() abuse.RateLimit {
 
 func (p *IPAPICom) Check(ctx context.Context, ip string) (*abuse.ProviderResult, error) {
 	var resp struct {
-		Proxy   bool   `json:"proxy"`
-		Hosting bool   `json:"hosting"`
-		Mobile  bool   `json:"mobile"`
-		Country string `json:"country"`
-		ISP     string `json:"isp"`
-		AS      string `json:"as"`
+		Proxy       bool   `json:"proxy"`
+		Hosting     bool   `json:"hosting"`
+		Mobile      bool   `json:"mobile"`
+		Country     string `json:"country"`
+		CountryCode string `json:"countryCode"`
+		ISP         string `json:"isp"`
+		AS          string `json:"as"`
 	}
-	endpoint := fmt.Sprintf("%s/%s?fields=proxy,hosting,mobile,country,isp,as,query", p.cfg.baseURL, url.PathEscape(ip))
+	endpoint := fmt.Sprintf("%s/%s?fields=proxy,hosting,mobile,country,countryCode,isp,as,query", p.cfg.baseURL, url.PathEscape(ip))
 	if err := requestJSON(ctx, p.cfg.client, "GET", endpoint, nil, &resp, p.Name()); err != nil {
 		return nil, err
 	}
@@ -44,5 +45,5 @@ func (p *IPAPICom) Check(ctx context.Context, ip string) (*abuse.ProviderResult,
 	if resp.Hosting {
 		cats = append(cats, "hosting")
 	}
-	return abuse.NormalizeResult(p.Name(), &abuse.ProviderResult{Score: score, Confidence: 0.6, Categories: cats, IsProxy: resp.Proxy, IsDatacenter: resp.Hosting, Raw: map[string]interface{}{"country": resp.Country, "isp": resp.ISP, "as": resp.AS}}), nil
+	return abuse.NormalizeResult(p.Name(), &abuse.ProviderResult{Score: score, Confidence: 0.6, Categories: cats, IsProxy: resp.Proxy, IsDatacenter: resp.Hosting, Country: resp.Country, CountryCode: resp.CountryCode, Raw: map[string]interface{}{"country": resp.Country, "country_code": resp.CountryCode, "isp": resp.ISP, "as": resp.AS}}), nil
 }

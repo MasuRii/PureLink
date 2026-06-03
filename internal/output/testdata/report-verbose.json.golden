@@ -1,5 +1,5 @@
 {
-  "abuse": 10,
+  "abuse_score": 10,
   "check": {
     "endpoint": {
       "host": "example.com",
@@ -17,8 +17,15 @@
   },
   "country": "",
   "country_code": "",
+  "dns_addrs": [
+    "93.184.216.34"
+  ],
   "endpoint": "example.com:443",
+  "generated": "2026-06-03T10:00:06.9364099Z",
+  "host": "example.com",
+  "http_status": 200,
   "latency_ms": 42,
+  "port": 443,
   "providers": [
     {
       "provider": "ipapi.is",
@@ -35,5 +42,9 @@
     }
   ],
   "purity": "clean",
-  "reachable": true
+  "reachable": true,
+  "tls": {
+    "cipher": "TLS_AES_128_GCM_SHA256",
+    "version": "TLS1.3"
+  }
 }

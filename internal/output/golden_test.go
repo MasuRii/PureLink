@@ -230,28 +230,27 @@ func TestGoldenRenderReport(t *testing.T) {
 	}
 }
 
-// ------------------------------------------------------------------
-// Report verbose mode uses the same table helpers but with extra
-// sections. Verify it still renders without panic; a full golden is
-// omitted because the output is a superset of the non-verbose path.
-// ------------------------------------------------------------------
-
-func TestGoldenRenderReportVerboseDoesNotPanic(t *testing.T) {
+func TestGoldenRenderReportVerbose(t *testing.T) {
 	check := goldenCheck()
 	providers := goldenProviders()
 
-	for _, format := range []string{"json", "csv", "table", "md"} {
-		var buf bytes.Buffer
-		if err := New(format, &buf).RenderReport(check, providers, true); err != nil {
-			t.Fatalf("format=%s: %v", format, err)
-		}
-		// Sanity assertions rather than golden files for verbose mode.
-		out := buf.String()
-		if out == "" {
-			t.Fatalf("format=%s produced empty output", format)
-		}
-		if format == "json" && !strings.Contains(out, "providers") {
-			t.Fatalf("format=%s verbose json should contain full providers", format)
-		}
+	tests := []struct {
+		format string
+		golden string
+	}{
+		{"json", "report-verbose.json.golden"},
+		{"csv", "report-verbose.csv.golden"},
+		{"table", "report-verbose.table.golden"},
+		{"md", "report-verbose.md.golden"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.format, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := New(tt.format, &buf).RenderReport(check, providers, true); err != nil {
+				t.Fatal(err)
+			}
+			assertGolden(t, tt.golden, buf.Bytes())
+		})
 	}
 }

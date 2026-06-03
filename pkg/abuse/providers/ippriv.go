@@ -52,6 +52,14 @@ func (p *IPPriv) Check(ctx context.Context, ip string) (*abuse.ProviderResult, e
 	if org := stringFromKeys(resp, "organization", "org", "isp"); org != "" {
 		raw["organization"] = org
 	}
+	country := stringFromKeys(resp, "country", "country_name")
+	countryCode := stringFromKeys(resp, "country_code", "countryCode")
+	if country != "" {
+		raw["country"] = country
+	}
+	if countryCode != "" {
+		raw["country_code"] = countryCode
+	}
 
-	return abuse.NormalizeResult(p.Name(), &abuse.ProviderResult{Score: score, Confidence: 0.6, Categories: cats, IsDatacenter: isHosting, IsVPN: isVPN, IsProxy: isProxy, IsTor: isTor, Raw: raw}), nil
+	return abuse.NormalizeResult(p.Name(), &abuse.ProviderResult{Score: score, Confidence: 0.6, Categories: cats, IsDatacenter: isHosting, IsVPN: isVPN, IsProxy: isProxy, IsTor: isTor, Country: country, CountryCode: countryCode, Raw: raw}), nil
 }

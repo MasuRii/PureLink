@@ -1,10 +1,12 @@
 {
   "abuse_score": 10,
+  "country": "",
+  "country_code": "",
   "dns_addrs": [
     "93.184.216.34"
   ],
   "endpoint": "example.com:443",
-  "generated": "__TIMESTAMP__",
+  "generated": "2026-06-02T20:59:34.472896Z",
   "host": "example.com",
   "http_status": 200,
   "latency_ms": 42,

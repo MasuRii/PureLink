@@ -12,7 +12,7 @@ CNAME:   —
 Reachability
 ────────────────────────────────────────────────────────────
 TCP:     true (42ms)
-TLS:     TLS1.3
+TLS:     TLS1.3 (TLS_AES_128_GCM_SHA256)
 HTTP:    200
 
 Abuse / Purity
@@ -21,3 +21,4 @@ Score:     10 / 100
 Verdict:   clean
 Region:    —
 Providers: ipapi.is
+  ipapi.is: score=10  confidence=0.95  datacenter=false  vpn=false  proxy=false  tor=false  purity=clean  categories=residential

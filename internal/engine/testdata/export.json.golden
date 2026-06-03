@@ -1,0 +1,42 @@
+[
+  {
+    "endpoint": {
+      "host": "192.0.2.10",
+      "port": 443
+    },
+    "protocol": "vless",
+    "country": "United States",
+    "country_code": "US",
+    "reachable": true,
+    "latency_ms": 12,
+    "abuse_score": 0,
+    "purity": "clean",
+    "provider_successes": 1,
+    "provider_total": 2
+  },
+  {
+    "endpoint": {
+      "host": "198.51.100.20",
+      "port": 8080
+    },
+    "protocol": "trojan",
+    "country": "Germany",
+    "country_code": "DE",
+    "reachable": false,
+    "latency_ms": 0,
+    "abuse_score": 65,
+    "purity": "suspicious"
+  },
+  {
+    "endpoint": {
+      "host": "vpn.example",
+      "port": 8443
+    },
+    "protocol": "vmess",
+    "country_code": "SG",
+    "reachable": true,
+    "latency_ms": 33,
+    "abuse_score": 72,
+    "purity": "vpn_detected"
+  }
+]

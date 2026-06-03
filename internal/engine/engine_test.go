@@ -3,11 +3,14 @@ package engine
 import (
 	"context"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/MasuRii/PureLink/internal/checker"
+	"github.com/MasuRii/PureLink/pkg/abuse"
 	"github.com/MasuRii/PureLink/pkg/endpoint"
+	plerrors "github.com/MasuRii/PureLink/pkg/errors"
 )
 
 func TestParseReaderAndDedupe(t *testing.T) {
@@ -28,10 +31,16 @@ func TestParseReaderAndDedupe(t *testing.T) {
 func TestBatchEngineRun(t *testing.T) {
 	eps := []endpoint.Endpoint{{Host: "192.0.2.1", Port: 443}, {Host: "192.0.2.2", Port: 443}}
 	progressCalls := 0
+	resultProgressCalls := 0
 	be := BatchEngine{Workers: 1, Timeout: time.Second, Filter: "reachable", Progress: func(processed, total int) {
 		progressCalls++
 		if total != 2 || processed < 1 || processed > 2 {
 			t.Fatalf("unexpected progress %d/%d", processed, total)
+		}
+	}, ResultProgress: func(item BatchItem, processed, total int) {
+		resultProgressCalls++
+		if item.Endpoint.Host == "" || total != 2 || processed < 1 || processed > 2 {
+			t.Fatalf("unexpected result progress item=%+v %d/%d", item, processed, total)
 		}
 	}, Checker: func(ctx context.Context, ep endpoint.Endpoint, opts checker.Options) checker.CheckResult {
 		return checker.CheckResult{Endpoint: ep, Reachable: true, LatencyMs: 5}
@@ -43,8 +52,47 @@ func TestBatchEngineRun(t *testing.T) {
 	if res.Summary.Total != 2 || res.Summary.Reachable != 2 || res.Summary.Clean != 2 {
 		t.Fatalf("got %+v", res.Summary)
 	}
-	if len(res.Items) != 2 || progressCalls != 2 {
-		t.Fatalf("items=%d progressCalls=%d", len(res.Items), progressCalls)
+	if len(res.Items) != 2 || progressCalls != 2 || resultProgressCalls != 2 {
+		t.Fatalf("items=%d progressCalls=%d resultProgressCalls=%d", len(res.Items), progressCalls, resultProgressCalls)
+	}
+}
+
+type retryOnceProvider struct {
+	calls atomic.Int32
+}
+
+func (p *retryOnceProvider) Name() string { return "retry-once" }
+func (p *retryOnceProvider) RateLimit() abuse.RateLimit {
+	return abuse.RateLimit{RequestsPerMinute: 1000, Burst: 10}
+}
+func (p *retryOnceProvider) Check(ctx context.Context, ip string) (*abuse.ProviderResult, error) {
+	if p.calls.Add(1) == 1 {
+		return nil, &abuse.ProviderError{Name: p.Name(), Err: plerrors.ErrProviderTimeout}
+	}
+	return &abuse.ProviderResult{Score: 60, Confidence: 1, Purity: "vpn_likely", IsVPN: true}, nil
+}
+
+func TestBatchEngineRetriesTimedOutProvidersAfterMainPass(t *testing.T) {
+	provider := &retryOnceProvider{}
+	be := BatchEngine{
+		Workers:   1,
+		Timeout:   time.Second,
+		Abuse:     true,
+		Providers: []abuse.Provider{provider},
+		Checker: func(ctx context.Context, ep endpoint.Endpoint, opts checker.Options) checker.CheckResult {
+			return checker.CheckResult{Endpoint: ep, Reachable: true, LatencyMs: 5}
+		},
+	}
+	res, err := be.Run(context.Background(), []endpoint.Endpoint{{Host: "192.0.2.1", Port: 443}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := provider.calls.Load(); got != 2 {
+		t.Fatalf("provider calls=%d, want initial + retry", got)
+	}
+	item := res.Items[0]
+	if item.AbuseScore != 60 || item.Purity != "vpn_likely" || item.ProviderSuccesses != 1 || len(item.ProviderErrs) != 0 {
+		t.Fatalf("retry result not merged correctly: %+v", item)
 	}
 }
 

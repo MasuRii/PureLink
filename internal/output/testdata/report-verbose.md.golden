@@ -1,6 +1,6 @@
 # PureLink Diagnostic Report
 
-Generated: 2026-06-02T20:59:34Z
+Generated: 2026-06-03T10:00:06Z
 
 ## Endpoint
 
@@ -25,3 +25,7 @@ Generated: 2026-06-02T20:59:34Z
 - **Verdict**: clean
 - **Region**: —
 - **Providers**: ipapi.is
+
+### Provider Signals
+
+- **ipapi.is**: score=10  confidence=0.95  datacenter=false  vpn=false  proxy=false  tor=false  purity=clean  categories=residential
