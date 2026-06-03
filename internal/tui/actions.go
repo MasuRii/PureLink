@@ -198,11 +198,6 @@ func speedtestCmd() tea.Cmd {
 	}
 }
 
-func importedActionMsg(eps []v2rayn.ImportedEndpoint, source, notice string) ActionCompleteMsg {
-	items := batchItemsFromImported(eps)
-	return ActionCompleteMsg{Snapshot: Snapshot{Items: items, Summary: engine.BatchSummary{Total: len(items), Processed: len(items)}, Source: source}, Notice: notice}
-}
-
 func batchItemsFromImported(eps []v2rayn.ImportedEndpoint) []engine.BatchItem {
 	items := make([]engine.BatchItem, 0, len(eps))
 	for _, ep := range eps {

@@ -55,14 +55,14 @@ func normalizeIPLogsVerdict(raw string) string {
 	verdict := strings.ToLower(strings.TrimSpace(raw))
 	verdict = strings.ReplaceAll(verdict, "-", "_")
 	verdict = strings.ReplaceAll(verdict, " ", "_")
-	switch {
-	case verdict == "vpn_detected", verdict == "detected":
+	switch verdict {
+	case "vpn_detected", "detected":
 		return "vpn_detected"
-	case verdict == "vpn_likely", verdict == "vpn", verdict == "proxy", verdict == "proxy_detected":
+	case "vpn_likely", "vpn", "proxy", "proxy_detected":
 		return "vpn_likely"
-	case verdict == "suspicious", verdict == "datacenter", verdict == "hosting", verdict == "data_center":
+	case "suspicious", "datacenter", "hosting", "data_center":
 		return "suspicious"
-	case verdict == "clean", verdict == "residential", verdict == "ok", verdict == "safe":
+	case "clean", "residential", "ok", "safe":
 		return "clean"
 	default:
 		return verdict
