@@ -74,6 +74,14 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           jq --arg v "$VERSION" '.version = $v' package.json > package.json.tmp
           mv package.json.tmp package.json
+      - name: Verify npm token
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "NPM_TOKEN secret is required for npm publish"
+            exit 1
+          fi
       - name: Publish package
         run: npm publish --access public
         env:

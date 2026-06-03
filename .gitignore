@@ -5,15 +5,24 @@
 *.dll
 *.so
 *.dylib
-bin/
+/bin/
 dist/
 temp/
+
+# npm local install artifacts
+npm/node_modules/
+npm/binaries/
+npm/bin/purelink
+npm/bin/purelink.exe
 
 # Test artifacts
 *.test
 *.out
 coverage.html
 coverage.out
+coverage-report/
+run-logs/
+*.log
 
 # Go workspace
 go.work

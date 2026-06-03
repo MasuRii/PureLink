@@ -1,6 +1,6 @@
 {
   "name": "purelink",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "CLI toolkit for vetting endpoints, IPs, and domains — ensuring your connections are clean, unique, and abuse-free.",
   "main": "index.js",
   "bin": {
