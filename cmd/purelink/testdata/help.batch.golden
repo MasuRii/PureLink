@@ -1,0 +1,28 @@
+Validate endpoints from file or stdin
+
+Usage:
+  purelink batch <file|-> [flags]
+
+Flags:
+      --abuse                  enable abuse checks
+      --dedupe                 deduplicate before processing
+      --export-clean string    write clean reachable endpoints to this file
+      --export-format string   export format: endpoints, links/share-links, subscription/v2rayn, csv, or json (default "endpoints")
+      --fail-on-abuse          exit with code 4 when abuse or purity risk is detected
+      --filter string          filter results: all, reachable, unreachable, abusive, suspicious, clean, errors (default "all")
+  -h, --help                   help for batch
+  -i, --interactive            open interactive TUI
+      --no-progress            disable progress reporting
+      --purity                 enable purity checks
+      --region                 include endpoint country/region lookup
+      --sort string            sort results by abuse, latency, host, or port (default "abuse")
+      --speed-test             run optional free download speed test and show it in output/TUI header
+      --stdin                  read from stdin
+      --workers int            concurrent worker count (default 8)
+
+Global Flags:
+  -c, --config string   config file path
+  -o, --format string   output format: table, json, csv, md (default "table")
+      --no-color        disable colored terminal output
+  -t, --timeout int     timeout per check in seconds (default 10)
+  -v, --verbose         enable verbose output

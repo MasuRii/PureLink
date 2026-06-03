@@ -1,0 +1,27 @@
+Endpoint purity and abuse scanner
+
+Usage:
+  purelink [flags]
+  purelink [command]
+
+Available Commands:
+  batch       Validate endpoints from file or stdin
+  check       Validate a single endpoint
+  completion  Generate the autocompletion script for the specified shell
+  configure   Show configuration guidance
+  dedupe      Find duplicates across lists
+  help        Help about any command
+  import      Import endpoints
+  report      Generate a full diagnostic report
+  speedtest   Run an optional free download speed test
+  version     Print version
+
+Flags:
+  -c, --config string   config file path
+  -o, --format string   output format: table, json, csv, md (default "table")
+  -h, --help            help for purelink
+      --no-color        disable colored terminal output
+  -t, --timeout int     timeout per check in seconds (default 10)
+  -v, --verbose         enable verbose output
+
+Use "purelink [command] --help" for more information about a command.

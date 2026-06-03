@@ -3,6 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -78,6 +81,32 @@ func TestImportLinkJSON(t *testing.T) {
 	}
 	if strings.Contains(out, "credential") || strings.Contains(out, "123e4567-e89b-12d3-a456-426614174000") || !strings.Contains(out, "192.0.2.1") {
 		t.Fatalf("out=%q", out)
+	}
+}
+
+func TestImportURLCommandJSON(t *testing.T) {
+	encoded := base64.StdEncoding.EncodeToString([]byte("vless://placeholder@192.0.2.44:443#sub\n"))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(encoded))
+	}))
+	defer server.Close()
+
+	out, _, err := execute("--format", "json", "import", "url", server.URL+"/sub?token=secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "192.0.2.44") || strings.Contains(out, "secret") {
+		t.Fatalf("out=%q", out)
+	}
+}
+
+func TestImportURLHelpIncludesAlias(t *testing.T) {
+	out, _, err := execute("import", "url", "--help")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "HTTP(S) subscription") || !strings.Contains(out, "--interactive") {
+		t.Fatalf("help missing subscription/import flags:\n%s", out)
 	}
 }
 

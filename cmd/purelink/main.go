@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	stderrors "errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"github.com/MasuRii/PureLink/internal/engine"
 	"github.com/MasuRii/PureLink/internal/importer"
 	"github.com/MasuRii/PureLink/internal/output"
+	"github.com/MasuRii/PureLink/internal/speedtest"
 	"github.com/MasuRii/PureLink/internal/tui"
 	"github.com/MasuRii/PureLink/pkg/abuse"
 	"github.com/MasuRii/PureLink/pkg/abuse/providers"
@@ -29,7 +31,13 @@ var version = "dev"
 
 var errAbuseThresholdExceeded = stderrors.New("abuse or purity threshold exceeded")
 
-var runTUI = tui.Run
+var (
+	runTUI           = tui.Run
+	runSpeedtest     = speedtest.Run
+	checkEndpoint    = checker.CheckEndpoint
+	providersByName  = providers.ByName
+	providersDefault = providers.Default
+)
 
 func main() {
 	root := newRootCommand(os.Stdout, os.Stderr)
@@ -64,7 +72,7 @@ func newRootCommand(stdout, stderr io.Writer) *cobra.Command {
 	root.PersistentFlags().Bool("no-color", false, "disable colored terminal output")
 	_ = app.v.BindPFlags(root.PersistentFlags())
 	_ = app.v.BindPFlag("no_color", root.PersistentFlags().Lookup("no-color"))
-	root.AddCommand(app.checkCommand(), app.batchCommand(), app.dedupeCommand(), app.reportCommand(), app.importCommand(), app.versionCommand(), app.configureCommand())
+	root.AddCommand(app.checkCommand(), app.batchCommand(), app.dedupeCommand(), app.reportCommand(), app.importCommand(), app.speedtestCommand(), app.versionCommand(), app.configureCommand())
 	return root
 }
 
@@ -93,11 +101,14 @@ func (a *cliApp) runDefaultTUI(cmd *cobra.Command, _ []string) error {
 		Output:     a.out,
 		AllowEmpty: true,
 	})
+	if stderrors.Is(err, tui.ErrNoTTY) || tui.IsEmptySnapshot(err) {
+		return cmd.Help()
+	}
 	return err
 }
 
 func (a *cliApp) checkCommand() *cobra.Command {
-	var abuseFlag, purityFlag, dnsFlag, httpFlag, failOnAbuse bool
+	var abuseFlag, purityFlag, regionFlag, dnsFlag, httpFlag, failOnAbuse bool
 	cmd := &cobra.Command{Use: "check <endpoint>", Short: "Validate a single endpoint", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		ep, err := endpoint.Parse(args[0])
 		if err != nil {
@@ -106,10 +117,10 @@ func (a *cliApp) checkCommand() *cobra.Command {
 		if failOnAbuse && !abuseFlag && !purityFlag {
 			abuseFlag = true
 		}
-		res := checker.CheckEndpoint(cmd.Context(), *ep, checker.Options{DNS: dnsFlag, HTTP: httpFlag, Timeout: a.cfg.Timeout})
+		res := checkEndpoint(cmd.Context(), *ep, checker.Options{DNS: dnsFlag, HTTP: httpFlag, Timeout: a.cfg.Timeout})
 		providerResults := []abuse.ProviderResult{}
-		if abuseFlag || purityFlag {
-			providerResults = a.runProviders(cmd.Context(), *ep, providerNames(abuseFlag, purityFlag, a.cfg))
+		if abuseFlag || purityFlag || regionFlag {
+			providerResults = a.runProviders(cmd.Context(), *ep, providerNames(abuseFlag, purityFlag, regionFlag, a.cfg))
 		}
 		if err := a.renderer().RenderCheck(res, providerResults); err != nil {
 			return err
@@ -121,6 +132,7 @@ func (a *cliApp) checkCommand() *cobra.Command {
 	}}
 	cmd.Flags().BoolVar(&abuseFlag, "abuse", false, "include abuse intelligence")
 	cmd.Flags().BoolVar(&purityFlag, "purity", false, "include purity signals")
+	cmd.Flags().BoolVar(&regionFlag, "region", false, "include endpoint country/region lookup")
 	cmd.Flags().BoolVar(&dnsFlag, "dns", false, "include DNS resolution info")
 	cmd.Flags().BoolVar(&httpFlag, "http", false, "include HTTP probe")
 	cmd.Flags().BoolVar(&failOnAbuse, "fail-on-abuse", false, "exit with code 4 when abuse or purity risk is detected")
@@ -129,8 +141,8 @@ func (a *cliApp) checkCommand() *cobra.Command {
 
 func (a *cliApp) batchCommand() *cobra.Command {
 	var workers int
-	var sortBy, filter string
-	var abuseFlag, dedupeFlag, stdinFlag, interactive, noProgress, failOnAbuse bool
+	var sortBy, filter, exportCleanPath, exportFormat string
+	var abuseFlag, purityFlag, regionFlag, speedTestFlag, dedupeFlag, stdinFlag, interactive, noProgress, failOnAbuse bool
 	cmd := &cobra.Command{Use: "batch <file|->", Short: "Validate endpoints from file or stdin", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		if err := engine.ValidateSortMode(sortBy); err != nil {
 			return err
@@ -163,37 +175,38 @@ func (a *cliApp) batchCommand() *cobra.Command {
 		for _, item := range parsed {
 			endpoints = append(endpoints, item.Endpoint)
 		}
-		if failOnAbuse {
+		if failOnAbuse && !abuseFlag && !purityFlag {
 			abuseFlag = true
 		}
 		provs := []abuse.Provider{}
-		if abuseFlag {
-			provs = providers.ByName(a.cfg.Providers.Abuse)
+		if abuseFlag || purityFlag || regionFlag {
+			provs = providersByName(providerNames(abuseFlag, purityFlag, regionFlag, a.cfg))
 			if len(provs) == 0 {
-				provs = providers.Default()
+				provs = providersDefault()
 			}
 		}
 		if !cmd.Flags().Changed("workers") {
 			workers = a.cfg.Workers
 		}
-		var progress engine.ProgressFunc
-		if !interactive && !noProgress && a.cfg.Format == "table" && len(endpoints) > 1 {
-			fmt.Fprintf(a.errOut, "Checking %d endpoints... 0/%d (0%%)", len(endpoints), len(endpoints))
-			progress = func(processed, total int) {
-				pct := 0
-				if total > 0 {
-					pct = processed * 100 / total
-				}
-				fmt.Fprintf(a.errOut, "\rChecking %d endpoints... %d/%d (%d%%)", total, processed, total, pct)
-				if processed == total {
-					fmt.Fprintln(a.errOut)
-				}
-			}
+		var progress, retryProgress engine.ProgressFunc
+		if !noProgress && a.cfg.Format == "table" && len(endpoints) > 1 {
+			progress = a.makeProgressReporter(len(endpoints))
+			retryProgress = a.makeRetryProgressReporter()
 		}
-		be := engine.BatchEngine{Workers: workers, Timeout: a.cfg.Timeout, Providers: provs, Abuse: abuseFlag, SortBy: sortBy, Filter: filter, Progress: progress}
+		be := engine.BatchEngine{Workers: workers, Timeout: a.cfg.Timeout, Providers: provs, Abuse: abuseFlag || purityFlag || regionFlag, SortBy: sortBy, Filter: filter, Progress: progress, RetryProgress: retryProgress}
 		result, err := be.Run(cmd.Context(), endpoints)
 		if err != nil {
 			return err
+		}
+		if speedTestFlag {
+			if speed, err := a.runOptionalSpeedtest(cmd.Context()); err == nil {
+				result.Summary.SpeedMbps = speed.Mbps
+			}
+		}
+		if exportCleanPath != "" {
+			if err := exportCleanItems(exportCleanPath, exportFormat, result.Items); err != nil {
+				return err
+			}
 		}
 		if interactive {
 			sourceLabel := source
@@ -201,9 +214,10 @@ func (a *cliApp) batchCommand() *cobra.Command {
 				sourceLabel = "stdin"
 			}
 			_, err := runTUI(cmd.Context(), tui.RunOptions{
-				Snapshot: tui.Snapshot{Items: result.Items, Summary: result.Summary, Source: sourceLabel},
-				NoColor:  a.cfg.NoColor,
-				Output:   a.out,
+				Snapshot:   tui.Snapshot{Items: result.Items, Summary: result.Summary, Source: sourceLabel},
+				NoColor:    a.cfg.NoColor,
+				Output:     a.out,
+				ExportPath: exportPathOrDefault(exportCleanPath),
 			})
 			if err == nil {
 				if failOnAbuse && batchResultRisky(*result) {
@@ -225,6 +239,9 @@ func (a *cliApp) batchCommand() *cobra.Command {
 	}}
 	cmd.Flags().IntVar(&workers, "workers", 8, "concurrent worker count")
 	cmd.Flags().BoolVar(&abuseFlag, "abuse", false, "enable abuse checks")
+	cmd.Flags().BoolVar(&purityFlag, "purity", false, "enable purity checks")
+	cmd.Flags().BoolVar(&regionFlag, "region", false, "include endpoint country/region lookup")
+	cmd.Flags().BoolVar(&speedTestFlag, "speed-test", false, "run optional free download speed test and show it in output/TUI header")
 	cmd.Flags().BoolVar(&stdinFlag, "stdin", false, "read from stdin")
 	cmd.Flags().BoolVar(&dedupeFlag, "dedupe", false, "deduplicate before processing")
 	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "open interactive TUI")
@@ -232,6 +249,8 @@ func (a *cliApp) batchCommand() *cobra.Command {
 	cmd.Flags().StringVar(&filter, "filter", "all", "filter results: all, reachable, unreachable, abusive, suspicious, clean, errors")
 	cmd.Flags().BoolVar(&noProgress, "no-progress", false, "disable progress reporting")
 	cmd.Flags().BoolVar(&failOnAbuse, "fail-on-abuse", false, "exit with code 4 when abuse or purity risk is detected")
+	cmd.Flags().StringVar(&exportCleanPath, "export-clean", "", "write clean reachable endpoints to this file")
+	cmd.Flags().StringVar(&exportFormat, "export-format", "endpoints", "export format: endpoints, links/share-links, subscription/v2rayn, csv, or json")
 	return cmd
 }
 
@@ -252,7 +271,7 @@ func (a *cliApp) reportCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		check := checker.CheckEndpoint(cmd.Context(), *ep, checker.Options{DNS: true, HTTP: true, TLS: true, Timeout: a.cfg.Timeout})
+		check := checkEndpoint(cmd.Context(), *ep, checker.Options{DNS: true, HTTP: true, TLS: true, Timeout: a.cfg.Timeout})
 		provs := a.runProviders(cmd.Context(), *ep, mergeProviderNames(a.cfg.Providers.Abuse, a.cfg.Providers.Purity))
 		if err := a.renderer().RenderReport(check, provs, verbose); err != nil {
 			return err
@@ -270,11 +289,17 @@ func (a *cliApp) reportCommand() *cobra.Command {
 func (a *cliApp) importCommand() *cobra.Command {
 	var outputPath string
 	var skipSecrets bool
+	var interactive, abuseFlag, purityFlag, regionFlag, speedTestFlag, failOnAbuse bool
+	var workers int
+	var sortBy, filter, exportCleanPath, exportFormat string
 	importCmd := &cobra.Command{Use: "import", Short: "Import endpoints"}
 	v2cmd := &cobra.Command{Use: "v2rayn <dir>", Short: "Import from a v2rayN installation", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		eps, err := importer.ImportV2rayN(args[0])
 		if err != nil {
 			return err
+		}
+		if interactive {
+			return a.runImportInteractive(cmd, eps, abuseFlag, purityFlag, regionFlag, speedTestFlag, workers, sortBy, filter, exportCleanPath, exportFormat, failOnAbuse, args[0])
 		}
 		return a.renderImportOutput(outputPath, eps, skipSecrets)
 	}}
@@ -283,14 +308,200 @@ func (a *cliApp) importCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		if interactive {
+			return a.runImportInteractive(cmd, eps, abuseFlag, purityFlag, regionFlag, speedTestFlag, workers, sortBy, filter, exportCleanPath, exportFormat, failOnAbuse, args[0])
+		}
 		return a.renderImportOutput(outputPath, eps, skipSecrets)
 	}}
-	for _, c := range []*cobra.Command{v2cmd, linkCmd} {
+	urlCmd := &cobra.Command{Use: "url <url...>", Aliases: []string{"sub"}, Short: "Import HTTP(S) subscription URLs", Args: cobra.MinimumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		eps, err := importer.ImportSubscriptionURLs(cmd.Context(), args, importer.SubscriptionOptions{Timeout: a.cfg.Timeout})
+		if err != nil {
+			return err
+		}
+		source := fmt.Sprintf("%d subscription URL(s)", len(args))
+		if interactive {
+			return a.runImportInteractive(cmd, eps, abuseFlag, purityFlag, regionFlag, speedTestFlag, workers, sortBy, filter, exportCleanPath, exportFormat, failOnAbuse, source)
+		}
+		return a.renderImportOutput(outputPath, eps, skipSecrets)
+	}}
+	for _, c := range []*cobra.Command{v2cmd, linkCmd, urlCmd} {
 		c.Flags().StringVarP(&outputPath, "output", "", "-", "write extracted endpoints to file or stdout")
 		c.Flags().BoolVar(&skipSecrets, "skip-secrets", true, "redact credentials from output")
+		c.Flags().BoolVarP(&interactive, "interactive", "i", false, "open interactive TUI")
+		c.Flags().BoolVar(&abuseFlag, "abuse", false, "enable abuse checks")
+		c.Flags().BoolVar(&purityFlag, "purity", false, "enable purity checks")
+		c.Flags().BoolVar(&regionFlag, "region", false, "include endpoint country/region lookup")
+		c.Flags().BoolVar(&speedTestFlag, "speed-test", false, "run optional free download speed test and show it in the TUI/header")
+		c.Flags().IntVar(&workers, "workers", 8, "concurrent worker count")
+		c.Flags().StringVar(&sortBy, "sort", "abuse", "sort results by abuse, latency, host, or port")
+		c.Flags().StringVar(&filter, "filter", "all", "filter results: all, reachable, unreachable, abusive, suspicious, clean, errors")
+		c.Flags().BoolVar(&failOnAbuse, "fail-on-abuse", false, "exit with code 4 when abuse or purity risk is detected")
+		c.Flags().StringVar(&exportCleanPath, "export-clean", "", "write clean reachable endpoints to this file after checks")
+		c.Flags().StringVar(&exportFormat, "export-format", "endpoints", "export format: endpoints, links/share-links, subscription/v2rayn, csv, or json")
 	}
-	importCmd.AddCommand(v2cmd, linkCmd)
+	importCmd.AddCommand(v2cmd, linkCmd, urlCmd)
 	return importCmd
+}
+
+func (a *cliApp) runImportInteractive(cmd *cobra.Command, eps []v2rayn.ImportedEndpoint, abuseFlag, purityFlag, regionFlag, speedTestFlag bool, workers int, sortBy, filter, exportCleanPath, exportFormat string, failOnAbuse bool, source string) error {
+	metadata := metadataForImported(eps)
+	endpoints := make([]endpoint.Endpoint, 0, len(eps))
+	for _, ep := range eps {
+		endpoints = append(endpoints, ep.ToEndpoint())
+	}
+	endpoints = dedupeEndpointList(endpoints)
+	fmt.Fprintf(a.errOut, "Imported %d endpoints from %s\n", len(endpoints), source)
+	provs := []abuse.Provider{}
+	if abuseFlag || purityFlag || regionFlag {
+		provs = providersByName(providerNames(abuseFlag, purityFlag, regionFlag, a.cfg))
+		if len(provs) == 0 {
+			provs = providersDefault()
+		}
+	}
+	if !cmd.Flags().Changed("workers") {
+		workers = a.cfg.Workers
+	}
+	progress := a.makeProgressReporter(len(endpoints))
+	retryProgress := a.makeRetryProgressReporter()
+	be := engine.BatchEngine{Workers: workers, Timeout: a.cfg.Timeout, Providers: provs, Abuse: abuseFlag || purityFlag || regionFlag, SortBy: sortBy, Filter: filter, Progress: progress, RetryProgress: retryProgress}
+	result, err := be.Run(cmd.Context(), endpoints)
+	if err != nil {
+		return err
+	}
+	applyBatchMetadata(result.Items, metadata)
+	if speedTestFlag {
+		if speed, err := a.runOptionalSpeedtest(cmd.Context()); err == nil {
+			result.Summary.SpeedMbps = speed.Mbps
+		}
+	}
+	if exportCleanPath != "" {
+		if err := exportCleanItems(exportCleanPath, exportFormat, result.Items); err != nil {
+			return err
+		}
+	}
+	fmt.Fprintf(a.errOut, "Done — %d reachable, %d unreachable, launching TUI...\n", result.Summary.Reachable, result.Summary.Unreachable)
+	_, err = runTUI(cmd.Context(), tui.RunOptions{
+		Snapshot:   tui.Snapshot{Items: reachableBatchItems(result.Items), Summary: result.Summary, Source: source},
+		NoColor:    a.cfg.NoColor,
+		Output:     a.out,
+		AllowEmpty: true,
+		ExportPath: exportPathOrDefault(exportCleanPath),
+	})
+	if err == nil {
+		if failOnAbuse && batchResultRisky(*result) {
+			return errAbuseThresholdExceeded
+		}
+		return nil
+	}
+	fmt.Fprintf(a.errOut, "TUI exited: %v\n", err)
+	if tui.IsEmptySnapshot(err) {
+		return a.renderer().RenderBatch(*result)
+	}
+	if stderrors.Is(err, tui.ErrNoTTY) {
+		return a.renderer().RenderBatch(*result)
+	}
+	return a.renderer().RenderBatch(*result)
+}
+
+type endpointMetadata struct {
+	Protocol string
+	RawURI   string
+}
+
+func metadataForImported(eps []v2rayn.ImportedEndpoint) map[string]endpointMetadata {
+	metadata := map[string]endpointMetadata{}
+	for _, imported := range eps {
+		key := imported.ToEndpoint().Normalize()
+		if _, exists := metadata[key]; exists {
+			continue
+		}
+		metadata[key] = endpointMetadata{Protocol: imported.Protocol, RawURI: imported.RawURI}
+	}
+	return metadata
+}
+
+func applyBatchMetadata(items []engine.BatchItem, metadata map[string]endpointMetadata) {
+	for i := range items {
+		if meta, ok := metadata[items[i].Endpoint.Normalize()]; ok {
+			items[i].Protocol = meta.Protocol
+			items[i].RawURI = meta.RawURI
+		}
+	}
+}
+
+func dedupeEndpointList(endpoints []endpoint.Endpoint) []endpoint.Endpoint {
+	seen := map[string]struct{}{}
+	out := make([]endpoint.Endpoint, 0, len(endpoints))
+	for _, ep := range endpoints {
+		key := ep.Normalize()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, ep)
+	}
+	return out
+}
+
+func reachableBatchItems(items []engine.BatchItem) []engine.BatchItem {
+	out := make([]engine.BatchItem, 0, len(items))
+	for _, item := range items {
+		if item.Reachable {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func exportCleanItems(path, format string, items []engine.BatchItem) error {
+	f, err := os.Create(path) // #nosec G304 -- CLI export intentionally writes to a user-specified path.
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	return engine.WriteExport(f, engine.CleanItems(items), format)
+}
+
+func exportPathOrDefault(path string) string {
+	if strings.TrimSpace(path) == "" {
+		return "PureLink-clean-endpoints.txt"
+	}
+	return path
+}
+
+func (a *cliApp) runOptionalSpeedtest(ctx context.Context) (speedtest.Result, error) {
+	fmt.Fprintln(a.errOut, "Running optional speed test...")
+	result, err := runSpeedtest(ctx, speedtest.Options{Timeout: a.cfg.Timeout})
+	if err != nil {
+		fmt.Fprintf(a.errOut, "Speed test skipped: %v\n", err)
+		return speedtest.Result{}, err
+	}
+	fmt.Fprintf(a.errOut, "Speed: %s\n", speedtest.Format(result))
+	return result, nil
+}
+
+func (a *cliApp) makeRetryProgressReporter() engine.ProgressFunc {
+	return func(processed, total int) {
+		if total <= 0 {
+			return
+		}
+		pct := processed * 100 / total
+		fmt.Fprintf(a.errOut, "Retrying timed-out providers... %d/%d (%d%%)\n", processed, total, pct)
+	}
+}
+
+func (a *cliApp) makeProgressReporter(total int) engine.ProgressFunc {
+	if total <= 1 {
+		return nil
+	}
+	fmt.Fprintf(a.errOut, "Checking %d endpoints... 0/%d (0%%)\n", total, total)
+	return func(processed, total int) {
+		pct := 0
+		if total > 0 {
+			pct = processed * 100 / total
+		}
+		fmt.Fprintf(a.errOut, "Checking %d endpoints... %d/%d (%d%%)\n", total, processed, total, pct)
+	}
 }
 
 func (a *cliApp) renderImportOutput(path string, eps []v2rayn.ImportedEndpoint, skipSecrets bool) error {
@@ -308,6 +519,30 @@ func (a *cliApp) renderImportOutput(path string, eps []v2rayn.ImportedEndpoint, 
 	r := output.New(a.cfg.Format, f)
 	r.NoColor = a.cfg.NoColor
 	return r.RenderImport(eps)
+}
+
+func (a *cliApp) speedtestCommand() *cobra.Command {
+	var url string
+	var maxBytes int64
+	cmd := &cobra.Command{Use: "speedtest", Short: "Run an optional free download speed test", RunE: func(cmd *cobra.Command, args []string) error {
+		if url == speedtest.DefaultURL && maxBytes != speedtest.DefaultMaxByte {
+			url = fmt.Sprintf("https://speed.cloudflare.com/__down?bytes=%d", maxBytes)
+		}
+		result, err := runSpeedtest(cmd.Context(), speedtest.Options{URL: url, MaxBytes: maxBytes, Timeout: a.cfg.Timeout})
+		if err != nil {
+			return err
+		}
+		if a.cfg.Format == "json" {
+			enc := json.NewEncoder(a.out)
+			enc.SetIndent("", "  ")
+			return enc.Encode(result)
+		}
+		fmt.Fprintf(a.out, "Speed: %s\nProvider: %s\n", speedtest.Format(result), result.URL)
+		return nil
+	}}
+	cmd.Flags().StringVar(&url, "url", speedtest.DefaultURL, "download URL used for speed testing")
+	cmd.Flags().Int64Var(&maxBytes, "bytes", speedtest.DefaultMaxByte, "maximum bytes to download")
+	return cmd
 }
 
 func (a *cliApp) versionCommand() *cobra.Command {
@@ -332,9 +567,9 @@ func (a *cliApp) runProviders(ctx context.Context, ep endpoint.Endpoint, names [
 			return nil
 		}
 	}
-	provs := providers.ByName(names)
+	provs := providersByName(names)
 	if len(provs) == 0 {
-		provs = providers.Default()
+		provs = providersDefault()
 	}
 	out := []abuse.ProviderResult{}
 	for _, p := range provs {
@@ -348,13 +583,16 @@ func (a *cliApp) runProviders(ctx context.Context, ep endpoint.Endpoint, names [
 	return out
 }
 
-func providerNames(includeAbuse, includePurity bool, cfg *config.Config) []string {
+func providerNames(includeAbuse, includePurity, includeRegion bool, cfg *config.Config) []string {
 	groups := [][]string{}
 	if includeAbuse {
 		groups = append(groups, cfg.Providers.Abuse)
 	}
 	if includePurity {
 		groups = append(groups, cfg.Providers.Purity)
+	}
+	if includeRegion {
+		groups = append(groups, []string{"ip-api.com", "ipapi.is"})
 	}
 	return mergeProviderNames(groups...)
 }
@@ -405,6 +643,7 @@ func redactImportedEndpoints(eps []v2rayn.ImportedEndpoint) []v2rayn.ImportedEnd
 		out[i].Label = v2rayn.Redact(out[i].Label)
 		out[i].SubGroup = v2rayn.Redact(out[i].SubGroup)
 		out[i].Source = v2rayn.Redact(out[i].Source)
+		out[i].RawURI = ""
 	}
 	return out
 }

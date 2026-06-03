@@ -1,0 +1,30 @@
+Import HTTP(S) subscription URLs
+
+Usage:
+  purelink import url <url...> [flags]
+
+Aliases:
+  url, sub
+
+Flags:
+      --abuse                  enable abuse checks
+      --export-clean string    write clean reachable endpoints to this file after checks
+      --export-format string   export format: endpoints, links/share-links, subscription/v2rayn, csv, or json (default "endpoints")
+      --fail-on-abuse          exit with code 4 when abuse or purity risk is detected
+      --filter string          filter results: all, reachable, unreachable, abusive, suspicious, clean, errors (default "all")
+  -h, --help                   help for url
+  -i, --interactive            open interactive TUI
+      --output string          write extracted endpoints to file or stdout (default "-")
+      --purity                 enable purity checks
+      --region                 include endpoint country/region lookup
+      --skip-secrets           redact credentials from output (default true)
+      --sort string            sort results by abuse, latency, host, or port (default "abuse")
+      --speed-test             run optional free download speed test and show it in the TUI/header
+      --workers int            concurrent worker count (default 8)
+
+Global Flags:
+  -c, --config string   config file path
+  -o, --format string   output format: table, json, csv, md (default "table")
+      --no-color        disable colored terminal output
+  -t, --timeout int     timeout per check in seconds (default 10)
+  -v, --verbose         enable verbose output
