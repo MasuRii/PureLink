@@ -4,7 +4,7 @@
 
 **CLI toolkit for vetting endpoints, IPs, and domains — ensuring your connections are clean, unique, and abuse-free.**
 
-[![Go Version](https://img.shields.io/badge/go-1.25.10-00ADD8?logo=go&logoColor=white)](https://go.dev/) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![CI](https://github.com/MasuRii/PureLink/actions/workflows/ci.yml/badge.svg)](https://github.com/MasuRii/PureLink/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/MasuRii/PureLink)](https://goreportcard.com/report/github.com/MasuRii/PureLink) [![Release](https://img.shields.io/github/v/release/MasuRii/PureLink?include_prereleases)](https://github.com/MasuRii/PureLink/releases) [![GitHub Downloads](https://img.shields.io/github/downloads/MasuRii/PureLink/total)](https://github.com/MasuRii/PureLink/releases)
+[![Go Version](https://img.shields.io/badge/go-1.25.11-00ADD8?logo=go&logoColor=white)](https://go.dev/) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![CI](https://github.com/MasuRii/PureLink/actions/workflows/ci.yml/badge.svg)](https://github.com/MasuRii/PureLink/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/MasuRii/PureLink)](https://goreportcard.com/report/github.com/MasuRii/PureLink) [![Release](https://img.shields.io/github/v/release/MasuRii/PureLink?include_prereleases)](https://github.com/MasuRii/PureLink/releases) [![GitHub Downloads](https://img.shields.io/github/downloads/MasuRii/PureLink/total)](https://github.com/MasuRii/PureLink/releases)
 
 <br />
 
@@ -365,7 +365,7 @@ PureLink/
 
 ### Prerequisites
 
-- [Go 1.25.10+](https://go.dev/dl/)
+- [Go 1.25.11+](https://go.dev/dl/)
 - [golangci-lint](https://golangci-lint.run/welcome/install/) (for linting)
 - [goreleaser](https://goreleaser.com/install/) (for releases)
 
