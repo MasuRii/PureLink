@@ -50,32 +50,6 @@ changelog:
       - '^test:'
       - '^chore:'
 
-homebrew_casks:
-  - name: purelink
-    repository:
-      owner: MasuRii
-      name: homebrew-tap
-      branch: main
-      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
-    homepage: "https://github.com/MasuRii/PureLink"
-    description: "CLI toolkit for vetting endpoints, IPs, and domains"
-    license: MIT
-    skip_upload: auto
-    binaries:
-      - purelink
-
-scoops:
-  - name: purelink
-    repository:
-      owner: MasuRii
-      name: scoop-bucket
-      branch: main
-      token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
-    description: "CLI toolkit for vetting endpoints, IPs, and domains"
-    license: MIT
-    homepage: "https://github.com/MasuRii/PureLink"
-    skip_upload: auto
-
 winget:
   - name: purelink
     publisher: MasuRii
