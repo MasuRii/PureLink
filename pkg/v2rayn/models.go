@@ -15,6 +15,10 @@ type ImportedEndpoint struct {
 	Label    string `json:"label,omitempty"`
 	SubGroup string `json:"sub_group,omitempty"`
 	Source   string `json:"source"`
+	// RawURI preserves the original share link in memory for explicit share-link
+	// exports. It is intentionally omitted from normal JSON/import output because
+	// share links can contain credentials.
+	RawURI string `json:"-"`
 }
 
 var configTypeProtocol = map[int]string{1: "vmess", 3: "shadowsocks", 4: "socks", 5: "vless", 6: "trojan", 7: "hysteria2", 8: "tuic", 9: "wireguard", 10: "http", 11: "anytls", 12: "naive"}
@@ -43,4 +47,9 @@ func normalizeHost(h string) string {
 func NewImported(protocol, host string, port int, label, subgroup, source string) (ImportedEndpoint, bool) {
 	ep := ImportedEndpoint{Protocol: strings.ToLower(strings.TrimSpace(protocol)), Host: normalizeHost(host), Port: port, Label: strings.TrimSpace(label), SubGroup: strings.TrimSpace(subgroup), Source: source}
 	return ep, ep.Validate() == nil
+}
+
+func (e ImportedEndpoint) WithRawURI(raw string) ImportedEndpoint {
+	e.RawURI = strings.TrimSpace(raw)
+	return e
 }

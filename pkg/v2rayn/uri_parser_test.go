@@ -2,6 +2,7 @@ package v2rayn
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -26,6 +27,9 @@ func TestParseShareLinks(t *testing.T) {
 			if ep.Protocol != tt.protocol || ep.Host != tt.host || ep.Port != tt.port || ep.Label != tt.label {
 				t.Fatalf("got %+v", ep)
 			}
+			if ep.RawURI != tt.line {
+				t.Fatalf("raw URI not preserved: got %q, want %q", ep.RawURI, tt.line)
+			}
 			if strings.Contains(ep.Label, "credential") || strings.Contains(ep.Host, "placeholder-id") {
 				t.Fatalf("credential leaked: %+v", ep)
 			}
@@ -46,6 +50,20 @@ Endpoint = 192.0.2.10:51820`
 	}
 	if eps[0].Protocol != "wireguard" || eps[0].Host != "192.0.2.10" || eps[0].Port != 51820 {
 		t.Fatalf("got %+v", eps[0])
+	}
+}
+
+func TestImportedEndpointRawURIIsOmittedFromJSON(t *testing.T) {
+	ep, ok := ParseLine("trojan://credential@192.0.2.3:443#label")
+	if !ok {
+		t.Fatal("ParseLine returned false")
+	}
+	b, err := json.Marshal(ep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "credential") || strings.Contains(string(b), "raw_uri") {
+		t.Fatalf("raw URI leaked into JSON: %s", b)
 	}
 }
 

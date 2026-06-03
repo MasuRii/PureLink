@@ -53,6 +53,18 @@ func TestParseLine_Protocols(t *testing.T) {
 	}
 }
 
+func TestParseContent_Base64Subscription(t *testing.T) {
+	plain := "vless://placeholder@192.0.2.30:443#sub-one\n trojan://secret@192.0.2.31:8443#sub-two\n"
+	encoded := base64.StdEncoding.EncodeToString([]byte(plain))
+	eps := ParseContent(encoded)
+	if len(eps) != 2 {
+		t.Fatalf("expected 2 endpoints, got %d", len(eps))
+	}
+	if eps[0].Protocol != "vless" || eps[0].Host != "192.0.2.30" || eps[1].Protocol != "trojan" || eps[1].Port != 8443 {
+		t.Fatalf("unexpected endpoints: %+v", eps)
+	}
+}
+
 func TestParseContent_WireGuardINIMultiline(t *testing.T) {
 	content := `[Interface]
 PrivateKey = PLACEHOLDER

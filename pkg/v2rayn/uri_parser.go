@@ -10,15 +10,25 @@ import (
 )
 
 func ParseContent(content string) []ImportedEndpoint {
+	return parseContentDepth(content, 0)
+}
+
+func parseContentDepth(content string, depth int) []ImportedEndpoint {
 	var out []ImportedEndpoint
 	out = append(out, parseSIP008(content)...)
 	if looksLikeWireGuardINI(content) {
 		out = append(out, ParseWireGuardINI(content)...)
 	}
 	s := bufio.NewScanner(strings.NewReader(content))
+	s.Buffer(make([]byte, 64*1024), 8*1024*1024)
 	for s.Scan() {
 		if ep, ok := ParseLine(s.Text()); ok {
 			out = append(out, ep)
+		}
+	}
+	if len(out) == 0 && depth < 2 {
+		if decoded, ok := decodeBase64Subscription(content); ok && strings.TrimSpace(string(decoded)) != strings.TrimSpace(content) {
+			out = append(out, parseContentDepth(string(decoded), depth+1)...)
 		}
 	}
 	return out
@@ -80,7 +90,10 @@ func parseVMess(line string) (ImportedEndpoint, bool) {
 		return ImportedEndpoint{}, false
 	}
 	label, _ := m["ps"].(string)
-	return NewImported("vmess", host, port, label, "", "link_file")
+	if ep, ok := NewImported("vmess", host, port, label, "", "link_file"); ok {
+		return ep.WithRawURI(line), true
+	}
+	return ImportedEndpoint{}, false
 }
 
 func parseV2rayNInner(line string) (ImportedEndpoint, bool) {
@@ -104,7 +117,10 @@ func parseV2rayNInner(line string) (ImportedEndpoint, bool) {
 	if !ok {
 		protocol = "unknown"
 	}
-	return NewImported(protocol, host, port, label, "", "link_file")
+	if ep, ok := NewImported(protocol, host, port, label, "", "link_file"); ok {
+		return ep.WithRawURI(line), true
+	}
+	return ImportedEndpoint{}, false
 }
 
 func parseSS(line string) (ImportedEndpoint, bool) {
@@ -124,7 +140,10 @@ func parseSS(line string) (ImportedEndpoint, bool) {
 	if at < 0 {
 		return ImportedEndpoint{}, false
 	}
-	return parseHostPort(decoded[at+1:], "shadowsocks", 8388, "")
+	if ep, ok := parseHostPort(decoded[at+1:], "shadowsocks", 8388, ""); ok {
+		return ep.WithRawURI(line), true
+	}
+	return ImportedEndpoint{}, false
 }
 
 func parseStandard(line, protocol string, defaultPort int) (ImportedEndpoint, bool) {
@@ -145,7 +164,10 @@ func parseStandard(line, protocol string, defaultPort int) (ImportedEndpoint, bo
 		port = p
 	}
 	label, _ := url.QueryUnescape(u.Fragment)
-	return NewImported(protocol, host, port, label, "", "link_file")
+	if ep, ok := NewImported(protocol, host, port, label, "", "link_file"); ok {
+		return ep.WithRawURI(line), true
+	}
+	return ImportedEndpoint{}, false
 }
 
 func parseHostPort(hp, protocol string, defaultPort int, label string) (ImportedEndpoint, bool) {
@@ -238,6 +260,29 @@ func decodeBase64(s string) ([]byte, bool) {
 		return b, true
 	}
 	return nil, false
+}
+
+func decodeBase64Subscription(s string) ([]byte, bool) {
+	compact := strings.Map(func(r rune) rune {
+		if r == ' ' || r == '\t' || r == '\n' || r == '\r' {
+			return -1
+		}
+		return r
+	}, s)
+	if compact == "" {
+		return nil, false
+	}
+	b, ok := decodeBase64(compact)
+	if !ok || !looksLikeSubscriptionContent(string(b)) {
+		return nil, false
+	}
+	return b, true
+}
+
+func looksLikeSubscriptionContent(s string) bool {
+	trimmed := strings.TrimSpace(s)
+	lower := strings.ToLower(trimmed)
+	return strings.Contains(lower, "://") || strings.Contains(lower, "[peer]") || strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[")
 }
 
 func padBase64(s string) string {

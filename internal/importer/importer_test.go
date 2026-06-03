@@ -1,11 +1,17 @@
 package importer
 
 import (
+	"context"
 	"database/sql"
+	"encoding/base64"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	plerrors "github.com/MasuRii/PureLink/pkg/errors"
 	"github.com/MasuRii/PureLink/pkg/v2rayn"
@@ -64,6 +70,72 @@ vless://b@192.0.2.1:443#label2
 	}
 	if len(eps) != 1 {
 		t.Fatalf("expected 1 deduped endpoint, got %d", len(eps))
+	}
+}
+
+func TestImportSubscriptionURLs_Base64AndPlain(t *testing.T) {
+	plain := "vless://placeholder@192.0.2.80:443#plain\n"
+	encoded := base64.StdEncoding.EncodeToString([]byte("trojan://secret@192.0.2.81:8443#encoded\n"))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/plain":
+			_, _ = w.Write([]byte(plain))
+		case "/base64":
+			_, _ = w.Write([]byte(encoded))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	eps, err := ImportSubscriptionURLs(context.Background(), []string{server.URL + "/plain?token=secret", server.URL + "/base64"}, SubscriptionOptions{Timeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(eps) != 2 {
+		t.Fatalf("expected 2 endpoints, got %d", len(eps))
+	}
+	if eps[0].Host != "192.0.2.80" || eps[1].Host != "192.0.2.81" {
+		t.Fatalf("unexpected endpoints: %+v", eps)
+	}
+	if strings.Contains(eps[0].Source, "secret") {
+		t.Fatalf("source leaked query secret: %q", eps[0].Source)
+	}
+}
+
+func TestImportSubscriptionURLsRejectsNonHTTP(t *testing.T) {
+	_, err := ImportSubscriptionURLs(context.Background(), []string{"file:///tmp/sub.txt"}, SubscriptionOptions{})
+	if err == nil || !errors.Is(err, errUnsupportedSubscriptionScheme) {
+		t.Fatalf("expected unsupported scheme error, got %v", err)
+	}
+}
+
+func TestFetchSubscriptionLimitsBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(strings.Repeat("x", 8)))
+	}))
+	defer server.Close()
+	_, _, err := FetchSubscription(context.Background(), server.URL+"/sub?token=secret", SubscriptionOptions{Timeout: time.Second, MaxBytes: 4})
+	if err == nil {
+		t.Fatal("expected body limit error")
+	}
+	if strings.Contains(err.Error(), "secret") {
+		t.Fatalf("error leaked query secret: %v", err)
+	}
+}
+
+func TestImportPastedSubscriptionsMixedRawAndRemote(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("trojan://secret@192.0.2.90:443#remote\n"))
+	}))
+	defer server.Close()
+
+	eps, err := ImportPastedSubscriptions(context.Background(), "vless://u@192.0.2.89:443#raw\n"+server.URL, SubscriptionOptions{Timeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(eps) != 2 {
+		t.Fatalf("expected 2 endpoints, got %d", len(eps))
 	}
 }
 
