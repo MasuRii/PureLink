@@ -1,0 +1,9 @@
+PureLink Batch — 5/5 (100%)                                              source: endpoints.txt  sort: abuse  filter: all                           
+Host               Port Protocol Region Reachable Latency Abuse Score Purity                                                                       
+ex2.example.com    443  —        —      yes       45ms    67          vpn_detected                                                                 
+suspicious.example 443  —        —      yes       33ms    55          suspicious                                                                   
+203.0.113.5        443  —        —      yes       89ms    12          clean                                                                        
+198.51.100.10      8080 —        —      no        —       —           unknown                                                                      
+ex1.purelink.dev   443  —        —      yes       12ms    0           clean                                                                        
+                                                                                                                                                   
+q quit  ↑↓ nav  enter detail  / search  ? actions  i import  c check  s sort  f filter  e export listed  r by region  p by protocol  E export clean

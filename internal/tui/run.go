@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"runtime"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -29,6 +30,10 @@ type RunOptions struct {
 	// AllowEmpty permits launching the TUI without batch results. The default
 	// batch integration leaves this false so empty batch inputs still fail fast.
 	AllowEmpty bool
+	// ExportPath is used when the user presses `E` to export clean endpoints.
+	ExportPath string
+	// ExportListedPath is used when the user presses `e` to export the current visible list.
+	ExportListedPath string
 }
 
 // ErrNoTTY is returned by Run when the program detects it is not connected to
@@ -49,7 +54,7 @@ func Run(ctx context.Context, opts RunOptions) (BatchModel, error) {
 		return BatchModel{}, ErrNoTTY
 	}
 
-	model := NewBatchModel(opts.Snapshot, Options{NoColor: opts.NoColor})
+	model := NewBatchModel(opts.Snapshot, Options{NoColor: opts.NoColor, ExportPath: opts.ExportPath, ExportListedPath: opts.ExportListedPath})
 	if opts.Headless {
 		// In headless mode we just return the constructed model so callers
 		// (and tests) can drive Update() manually. The contract is that no
@@ -94,5 +99,39 @@ func hasTerminalInput(input *os.File) bool {
 	if err != nil {
 		return false
 	}
-	return info.Mode()&os.ModeCharDevice != 0
+	if info.Mode()&os.ModeCharDevice != 0 {
+		return true
+	}
+	// MSYS2, MinTTY (Git Bash default), and Cygwin expose stdin as a
+	// pipe-backed PTY rather than a native character device.  Detect these
+	// environments so the TUI can launch on Windows under Git Bash / MSYS.
+	if info.Mode()&os.ModeNamedPipe != 0 && isMSYSEnvironment() {
+		return true
+	}
+	return false
+}
+
+// isMSYSEnvironment reports whether the current process is running inside an
+// MSYS2, MinTTY, or Cygwin shell on Windows.  These environments expose a
+// POSIX-compatible PTY through a Windows named pipe, which causes the
+// standard os.ModeCharDevice check to fail even though the session is fully
+// interactive.
+func isMSYSEnvironment() bool {
+	if runtime.GOOS != "windows" {
+		return false
+	}
+	// MSYSTEM is set by all MSYS2 shell variants (MSYS, MINGW64, UCRT64, …).
+	if os.Getenv("MSYSTEM") != "" {
+		return true
+	}
+	// TERM_PROGRAM=mintty indicates the MinTTY terminal emulator used by
+	// Git Bash and standalone MSYS2 installations.
+	if os.Getenv("TERM_PROGRAM") == "mintty" {
+		return true
+	}
+	// MINGW_PREFIX is another MSYS2-specific variable (e.g. /mingw64).
+	if os.Getenv("MINGW_PREFIX") != "" {
+		return true
+	}
+	return false
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -28,6 +29,22 @@ func sampleSnapshot() Snapshot {
 		Summary: engine.Summarize(items),
 		Source:  "endpoints.txt",
 	}
+}
+
+func runActionForTest(t *testing.T, m BatchModel, value string) BatchModel {
+	t.Helper()
+	msg := m.runActionCmd(value)()
+	model, cmd := m.Update(msg)
+	bm := model.(BatchModel)
+	for i := 0; cmd != nil && i < 10000; i++ {
+		msg = cmd()
+		model, cmd = bm.Update(msg)
+		bm = model.(BatchModel)
+	}
+	if cmd != nil {
+		t.Fatal("action stream did not finish")
+	}
+	return bm
 }
 
 func TestNewBatchModelInitialState(t *testing.T) {
@@ -103,6 +120,46 @@ func TestBatchModelSearchHostSubstring(t *testing.T) {
 	m.SetSearch("")
 	if got := len(m.Visible()); got != 5 {
 		t.Fatalf("search reset: want 5, got %d", got)
+	}
+}
+
+func TestBatchModelExportsVisibleList(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "listed.txt")
+	m := NewBatchModel(sampleSnapshot(), Options{NoColor: true, ExportListedPath: path})
+	m.SetSearch("ex2")
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	bm := updated.(BatchModel)
+	if bm.lastErr != nil {
+		t.Fatalf("export visible failed: %v", bm.lastErr)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(data)
+	if !strings.Contains(out, "ex2.example.com:443") || strings.Contains(out, "ex1.purelink.dev") {
+		t.Fatalf("visible export did not honor current search/list: %q", out)
+	}
+	if !strings.Contains(bm.lastNotice, "exported 1 listed endpoints") {
+		t.Fatalf("unexpected notice: %q", bm.lastNotice)
+	}
+}
+
+func TestBatchModelExportsCleanWithShiftE(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "clean.txt")
+	m := NewBatchModel(sampleSnapshot(), Options{NoColor: true, ExportPath: path})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'E'}})
+	bm := updated.(BatchModel)
+	if bm.lastErr != nil {
+		t.Fatalf("export clean failed: %v", bm.lastErr)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(data)
+	if !strings.Contains(out, "ex1.purelink.dev:443") || !strings.Contains(out, "203.0.113.5:443") || strings.Contains(out, "ex2.example.com") {
+		t.Fatalf("clean export did not export only clean endpoints: %q", out)
 	}
 }
 
@@ -183,6 +240,85 @@ func TestBatchModelStreamingResultMsg(t *testing.T) {
 	bm := updated.(BatchModel)
 	if got := len(bm.Visible()); got != 1 {
 		t.Fatalf("after stream msg: want 1, got %d", got)
+	}
+}
+
+func TestBatchModelSmartAutoFollowTail(t *testing.T) {
+	items := []engine.BatchItem{
+		{Endpoint: endpoint.Endpoint{Host: "a", Port: 1}, Purity: "unknown"},
+		{Endpoint: endpoint.Endpoint{Host: "b", Port: 1}, Purity: "unknown"},
+		{Endpoint: endpoint.Endpoint{Host: "c", Port: 1}, Purity: "unknown"},
+	}
+	m := NewBatchModel(Snapshot{Items: items, Summary: engine.Summarize(items)}, Options{})
+	m.cursor = len(m.visible) - 1
+	updated, _ := m.Update(CheckResultMsg{Endpoint: endpoint.Endpoint{Host: "d", Port: 1}, Item: engine.BatchItem{Endpoint: endpoint.Endpoint{Host: "d", Port: 1}, Purity: "unknown"}, Processed: 4, Total: 4})
+	bm := updated.(BatchModel)
+	if bm.Cursor() != len(bm.Visible())-1 {
+		t.Fatalf("expected auto-follow cursor at tail, cursor=%d len=%d", bm.Cursor(), len(bm.Visible()))
+	}
+
+	bm.cursor = 0
+	updated, _ = bm.Update(CheckResultMsg{Endpoint: endpoint.Endpoint{Host: "e", Port: 1}, Item: engine.BatchItem{Endpoint: endpoint.Endpoint{Host: "e", Port: 1}, Purity: "unknown"}, Processed: 5, Total: 5})
+	bm = updated.(BatchModel)
+	if bm.Cursor() != 0 {
+		t.Fatalf("expected cursor to stay scrolled away, got %d", bm.Cursor())
+	}
+}
+
+func TestBatchModelEmptyViewRendersBrandAndActions(t *testing.T) {
+	m := NewBatchModel(Snapshot{Source: "interactive"}, Options{NoColor: true, Width: 120, Height: 30})
+	view := m.View()
+	if !strings.Contains(view, "███████████") {
+		t.Fatalf("empty FTUX view missing branded ASCII: %s", view)
+	}
+	for _, want := range []string{"i  import", "c  check", "T  run speed test"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("empty FTUX view missing action %q: %s", want, view)
+		}
+	}
+}
+
+func TestBatchModelImportActionParsesPastedRawLinks(t *testing.T) {
+	m := NewBatchModel(Snapshot{Source: "interactive"}, Options{NoColor: true})
+	m.OpenAction(ActionImportURL)
+	bm := runActionForTest(t, m, "vless://placeholder@192.0.2.77:443#raw\ntrojan://secret@192.0.2.78:8443#raw2")
+	if bm.lastErr != nil {
+		t.Fatalf("unexpected error: %v", bm.lastErr)
+	}
+	if got := len(bm.Visible()); got != 2 {
+		t.Fatalf("expected 2 imported endpoints, got %d", got)
+	}
+	if !strings.Contains(bm.lastNotice, "imported 2 endpoints") {
+		t.Fatalf("unexpected notice: %q", bm.lastNotice)
+	}
+}
+
+func TestBatchModelActionMenuOpensInput(t *testing.T) {
+	m := NewBatchModel(Snapshot{Source: "interactive"}, Options{NoColor: true})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	bm := updated.(BatchModel)
+	if bm.Mode() != ModeActionMenu {
+		t.Fatalf("expected action menu, got %v", bm.Mode())
+	}
+	updated, _ = bm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	bm = updated.(BatchModel)
+	if bm.Mode() != ModeInput || bm.currentAction != ActionImportURL {
+		t.Fatalf("expected import input, mode=%v action=%v", bm.Mode(), bm.currentAction)
+	}
+}
+
+func TestBatchModelDeduplicatesCurrentList(t *testing.T) {
+	snap := Snapshot{Items: []engine.BatchItem{
+		{Endpoint: endpoint.Endpoint{Host: "dup.example", Port: 443}, Purity: "unknown"},
+		{Endpoint: endpoint.Endpoint{Host: "dup.example", Port: 443}, Purity: "unknown"},
+	}}
+	m := NewBatchModel(snap, Options{NoColor: true})
+	m.DeduplicateCurrent()
+	if got := len(m.Visible()); got != 1 {
+		t.Fatalf("expected 1 deduped endpoint, got %d", got)
+	}
+	if !strings.Contains(m.lastNotice, "removed 1") {
+		t.Fatalf("unexpected notice: %q", m.lastNotice)
 	}
 }
 
@@ -419,7 +555,7 @@ func TestBatchModelEmptyVisibleRendersHint(t *testing.T) {
 	}
 }
 
-func TestBatchModelPadRightTruncatesLongHosts(t *testing.T) {
+func TestBatchModelAutoWidthsLongHosts(t *testing.T) {
 	long := strings.Repeat("a", 60)
 	snap := Snapshot{
 		Items: []engine.BatchItem{{
@@ -431,8 +567,8 @@ func TestBatchModelPadRightTruncatesLongHosts(t *testing.T) {
 	}
 	m := NewBatchModel(snap, Options{NoColor: true, Width: 120, Height: 24})
 	view := m.View()
-	if !strings.Contains(view, "…") {
-		t.Fatalf("long host should be truncated with ellipsis, view=%s", view)
+	if !strings.Contains(view, long) || strings.Contains(view, "…") {
+		t.Fatalf("long host should be fully visible without ellipsis, view=%s", view)
 	}
 }
 

@@ -1,0 +1,15 @@
+Detail: vpn.example:8443
+  Host:       vpn.example
+  Port:       8443
+  Protocol:   vless
+  Region:     Germany
+  Reachable:  true
+  Latency:    20ms
+  Abuse:      80
+  Purity:     vpn_detected
+  Providers:  1/2 successful
+  Speed:      12.34 Mbps
+
+Provider Warnings
+  Verdict used the successful provider responses below; unavailable providers were not averaged in.
+  - ipapi.is: timeout after retry

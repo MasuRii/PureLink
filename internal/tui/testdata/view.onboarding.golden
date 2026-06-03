@@ -1,0 +1,24 @@
+PureLink Batch — 0/0 (0%)                                                  source: interactive  sort: abuse  filter: all                           
+ ███████████                                █████        ███             █████                                                                     
+▒▒███▒▒▒▒▒███                              ▒▒███        ▒▒▒             ▒▒███                                                                      
+ ▒███    ▒███ █████ ████ ████████   ██████  ▒███        ████  ████████   ▒███ █████                                                                
+ ▒██████████ ▒▒███ ▒███ ▒▒███▒▒███ ███▒▒███ ▒███       ▒▒███ ▒▒███▒▒███  ▒███▒▒███                                                                 
+ ▒███▒▒▒▒▒▒   ▒███ ▒███  ▒███ ▒▒▒ ▒███████  ▒███        ▒███  ▒███ ▒███  ▒██████▒                                                                  
+ ▒███         ▒███ ▒███  ▒███     ▒███▒▒▒   ▒███      █ ▒███  ▒███ ▒███  ▒███▒▒███                                                                 
+ █████        ▒▒████████ █████    ▒▒██████  ███████████ █████ ████ █████ ████ █████                                                                
+▒▒▒▒▒          ▒▒▒▒▒▒▒▒ ▒▒▒▒▒      ▒▒▒▒▒▒  ▒▒▒▒▒▒▒▒▒▒▒ ▒▒▒▒▒ ▒▒▒▒ ▒▒▒▒▒ ▒▒▒▒ ▒▒▒▒▒                                                                 
+                                                                                                                                                   
+First run: no endpoints loaded yet — import, check, and inspect without leaving the TUI                                                            
+Paste HTTP(S) subscription URLs, raw vmess/vless/trojan/ss links, or base64/plain v2rayN-style subscriptions.                                      
+                                                                                                                                                   
+  i  import subscription/raw URLs (multiple accepted)                                                                                              
+  b  run a batch endpoint file                                                                                                                     
+  l  import share-link file                                                                                                                        
+  v  import v2rayN folder                                                                                                                          
+  c  check one endpoint                                                                                                                            
+  R  report DNS/TLS/HTTP for one endpoint                                                                                                          
+  d  dedupe files    D  dedupe current list                                                                                                        
+  T  run speed test  ?  show this menu                                                                                                             
+                                                                                                                                                   
+After results load: ↑↓ navigate, enter detail, / search, s sort, f filter, e/r/p/E export.                                                         
+q quit  ↑↓ nav  enter detail  / search  ? actions  i import  c check  s sort  f filter  e export listed  r by region  p by protocol  E export clean

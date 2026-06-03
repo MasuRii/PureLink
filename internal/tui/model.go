@@ -1,13 +1,16 @@
 package tui
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/MasuRii/PureLink/internal/engine"
 )
@@ -22,6 +25,24 @@ const (
 	ModeFilter
 	// ModeDetail shows the full provider/diagnostic detail for the cursor.
 	ModeDetail
+	// ModeActionMenu shows first-time/action shortcuts.
+	ModeActionMenu
+	// ModeInput captures command input for imports/checks/reports.
+	ModeInput
+)
+
+// ActionKind identifies a TUI workflow that mirrors a CLI entry point.
+type ActionKind int
+
+const (
+	ActionNone ActionKind = iota
+	ActionImportURL
+	ActionBatchFile
+	ActionLinkFile
+	ActionV2RayN
+	ActionCheck
+	ActionReport
+	ActionDedupeFiles
 )
 
 // SortKey identifies a column to sort by. The cycle order matches the help
@@ -105,6 +126,10 @@ type Options struct {
 	Width int
 	// Height is the initial render height with the same semantics as Width.
 	Height int
+	// ExportPath is used when the user presses `E` to export clean endpoints.
+	ExportPath string
+	// ExportListedPath is used when the user presses `e` to export the current visible list.
+	ExportListedPath string
 }
 
 // BatchModel is the top-level Bubble Tea model for `purelink batch -i`.
@@ -126,6 +151,7 @@ type BatchModel struct {
 
 	// components
 	filterInput textinput.Model
+	actionInput textinput.Model
 	detail      viewport.Model
 	spin        spinner.Model
 
@@ -137,6 +163,17 @@ type BatchModel struct {
 
 	// lastErr is rendered in the help bar when present.
 	lastErr error
+	// lastNotice is rendered in the help bar for successful actions.
+	lastNotice string
+	// currentAction is set while ModeInput is gathering workflow input.
+	currentAction ActionKind
+	// activeActionStream receives live results for the currently running TUI action.
+	activeActionStream <-chan tea.Msg
+	activeActionCancel context.CancelFunc
+	// exportPath is the target path used by the `E` key for clean exports.
+	exportPath string
+	// exportListedPath is the target path used by the `e` key for current list exports.
+	exportListedPath string
 }
 
 // NewBatchModel constructs a model from a snapshot. The model is fully
@@ -158,18 +195,32 @@ func NewBatchModel(snap Snapshot, opts Options) BatchModel {
 	ti.Placeholder = "type to filter host/purity, esc to clear"
 	ti.CharLimit = 128
 	ti.Prompt = "/ "
+	actionInput := textinput.New()
+	actionInput.CharLimit = 8192
+	actionInput.Prompt = "> "
 	vp := viewport.New(width, max(height-8, 8))
 	sp := spinner.New(spinner.WithSpinner(spinner.Dot))
 	sp.Style = theme.Spinner
+	exportPath := opts.ExportPath
+	if strings.TrimSpace(exportPath) == "" {
+		exportPath = "PureLink-clean-endpoints.txt"
+	}
+	exportListedPath := opts.ExportListedPath
+	if strings.TrimSpace(exportListedPath) == "" {
+		exportListedPath = "PureLink-listed-endpoints.txt"
+	}
 	m := BatchModel{
-		theme:       theme,
-		snapshot:    snap,
-		mode:        ModeList,
-		filterInput: ti,
-		detail:      vp,
-		spin:        sp,
-		width:       width,
-		height:      height,
+		theme:            theme,
+		snapshot:         snap,
+		mode:             ModeList,
+		filterInput:      ti,
+		actionInput:      actionInput,
+		detail:           vp,
+		spin:             sp,
+		width:            width,
+		height:           height,
+		exportPath:       exportPath,
+		exportListedPath: exportListedPath,
 	}
 	m.recompute()
 	return m
@@ -230,6 +281,65 @@ func (m *BatchModel) CycleFilter() {
 func (m *BatchModel) SetSearch(s string) {
 	m.search = strings.TrimSpace(s)
 	m.recompute()
+}
+
+func (m *BatchModel) ExportVisible() error {
+	visible := m.Visible()
+	if err := writeEndpointExport(m.exportListedPath, visible); err != nil {
+		return err
+	}
+	m.lastErr = nil
+	m.lastNotice = fmt.Sprintf("exported %d listed endpoints to %s", len(visible), m.exportListedPath)
+	return nil
+}
+
+func (m *BatchModel) ExportVisibleByRegion() error {
+	return m.exportVisibleGrouped("region", splitExportDirectory(m.exportListedPath, "by-region"))
+}
+
+func (m *BatchModel) ExportVisibleByProtocol() error {
+	return m.exportVisibleGrouped("protocol", splitExportDirectory(m.exportListedPath, "by-protocol"))
+}
+
+func (m *BatchModel) exportVisibleGrouped(groupBy, directory string) error {
+	visible := m.Visible()
+	result, err := engine.WriteSplitExport(directory, visible, groupBy, "endpoints")
+	if err != nil {
+		return err
+	}
+	m.lastErr = nil
+	m.lastNotice = fmt.Sprintf("exported %d listed endpoints into %d %s files at %s", result.Count, len(result.Files), groupBy, result.Directory)
+	return nil
+}
+
+func (m *BatchModel) ExportClean() error {
+	clean := engine.CleanItems(m.snapshot.Items)
+	if err := writeEndpointExport(m.exportPath, clean); err != nil {
+		return err
+	}
+	m.lastErr = nil
+	m.lastNotice = fmt.Sprintf("exported %d clean endpoints to %s", len(clean), m.exportPath)
+	return nil
+}
+
+func splitExportDirectory(path, suffix string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "PureLink-listed-" + suffix
+	}
+	cleaned := strings.TrimSuffix(path, ".txt")
+	cleaned = strings.TrimSuffix(cleaned, ".csv")
+	cleaned = strings.TrimSuffix(cleaned, ".json")
+	return cleaned + "-" + suffix
+}
+
+func writeEndpointExport(path string, items []engine.BatchItem) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	return engine.WriteExport(f, items, "endpoints")
 }
 
 // MoveCursor adjusts the cursor by delta, clamped to [0, len(visible)-1].
@@ -318,6 +428,12 @@ func matchesSearch(it engine.BatchItem, needle string) bool {
 		return true
 	}
 	if strings.Contains(strings.ToLower(it.Purity), needle) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(it.Protocol), needle) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(it.Country), needle) || strings.Contains(strings.ToLower(it.CountryCode), needle) {
 		return true
 	}
 	if strings.Contains(fmt.Sprintf("%d", it.Endpoint.Port), needle) {

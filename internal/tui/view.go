@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/MasuRii/PureLink/internal/engine"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -26,8 +27,24 @@ func (m BatchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 
+	case ActionStartedMsg:
+		if m.activeActionCancel != nil {
+			m.activeActionCancel()
+		}
+		m.activeActionStream = msg.Stream
+		m.activeActionCancel = msg.Cancel
+		m.snapshot = Snapshot{Source: msg.Source}
+		m.cursor = 0
+		m.mode = ModeList
+		m.currentAction = ActionNone
+		m.lastErr = nil
+		m.lastNotice = msg.Notice
+		m.recompute()
+		return m, waitForActionStream(msg.Stream)
+
 	case CheckResultMsg:
 		// Streaming integration path: append/replace by host:port key.
+		follow := m.shouldAutoFollowTail()
 		key := msg.Endpoint.Normalize()
 		replaced := false
 		for i, existing := range m.snapshot.Items {
@@ -40,15 +57,59 @@ func (m BatchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !replaced {
 			m.snapshot.Items = append(m.snapshot.Items, msg.Item)
 		}
+		m.snapshot.Summary = engine.Summarize(m.snapshot.Items)
+		if msg.Total > 0 {
+			m.snapshot.Summary.Total = msg.Total
+		}
+		if msg.Processed > 0 {
+			m.snapshot.Summary.Processed = msg.Processed
+		}
 		m.recompute()
-		return m, nil
+		if follow && len(m.visible) > 0 {
+			m.cursor = len(m.visible) - 1
+		}
+		return m, m.nextActionStreamCmd()
 
 	case BatchCompleteMsg:
 		m.snapshot.Summary = msg.Summary
+		if msg.Source != "" {
+			m.snapshot.Source = msg.Source
+		}
+		m.lastErr = nil
+		m.lastNotice = msg.Notice
+		m.activeActionStream = nil
+		m.activeActionCancel = nil
+		return m, nil
+
+	case actionStreamClosedMsg:
+		m.activeActionStream = nil
+		m.activeActionCancel = nil
 		return m, nil
 
 	case ErrorMsg:
+		if m.activeActionCancel != nil {
+			m.activeActionCancel()
+		}
+		m.activeActionStream = nil
+		m.activeActionCancel = nil
+		m.lastNotice = ""
 		m.lastErr = msg.Err
+		return m, nil
+
+	case ActionCompleteMsg:
+		m.activeActionStream = nil
+		m.activeActionCancel = nil
+		if len(msg.Snapshot.Items) == 0 && msg.Snapshot.Summary.SpeedMbps > 0 {
+			m.snapshot.Summary.SpeedMbps = msg.Snapshot.Summary.SpeedMbps
+			m.snapshot.Source = msg.Snapshot.Source
+		} else {
+			m.snapshot = msg.Snapshot
+		}
+		m.mode = ModeList
+		m.currentAction = ActionNone
+		m.lastErr = nil
+		m.lastNotice = msg.Notice
+		m.recompute()
 		return m, nil
 	}
 
@@ -59,6 +120,55 @@ func (m BatchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m BatchModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.mode == ModeInput {
+		switch msg.String() {
+		case "esc":
+			m.mode = ModeList
+			m.currentAction = ActionNone
+			m.actionInput.Blur()
+			return m, nil
+		case "enter":
+			value := m.actionInput.Value()
+			m.actionInput.Blur()
+			m.mode = ModeList
+			m.lastErr = nil
+			m.lastNotice = "running " + strings.ToLower(actionTitle(m.currentAction)) + "..."
+			return m, m.runActionCmd(value)
+		default:
+			var cmd tea.Cmd
+			m.actionInput, cmd = m.actionInput.Update(msg)
+			return m, cmd
+		}
+	}
+
+	if m.mode == ModeActionMenu {
+		switch msg.String() {
+		case "esc", "q", "?":
+			m.mode = ModeList
+			return m, nil
+		case "i":
+			m.OpenAction(ActionImportURL)
+		case "b":
+			m.OpenAction(ActionBatchFile)
+		case "l":
+			m.OpenAction(ActionLinkFile)
+		case "v":
+			m.OpenAction(ActionV2RayN)
+		case "c":
+			m.OpenAction(ActionCheck)
+		case "R":
+			m.OpenAction(ActionReport)
+		case "d":
+			m.OpenAction(ActionDedupeFiles)
+		case "D":
+			m.DeduplicateCurrent()
+		case "T":
+			m.lastNotice = "running speed test..."
+			return m, speedtestCmd()
+		}
+		return m, nil
+	}
+
 	if m.mode == ModeFilter {
 		switch msg.String() {
 		case "esc":
@@ -93,6 +203,9 @@ func (m BatchModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.String() {
 	case "q", "ctrl+c":
+		if m.activeActionCancel != nil {
+			m.activeActionCancel()
+		}
 		m.quitting = true
 		return m, tea.Quit
 	case "up", "k":
@@ -112,10 +225,51 @@ func (m BatchModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.mode = ModeFilter
 		m.filterInput.Focus()
+	case "?":
+		m.OpenActionMenu()
+	case "i":
+		m.OpenAction(ActionImportURL)
+	case "b":
+		m.OpenAction(ActionBatchFile)
+	case "l":
+		m.OpenAction(ActionLinkFile)
+	case "v":
+		m.OpenAction(ActionV2RayN)
+	case "c":
+		m.OpenAction(ActionCheck)
+	case "R":
+		m.OpenAction(ActionReport)
+	case "d":
+		m.OpenAction(ActionDedupeFiles)
+	case "D":
+		m.DeduplicateCurrent()
+	case "T":
+		m.lastNotice = "running speed test..."
+		return m, speedtestCmd()
 	case "s":
 		m.CycleSort()
 	case "f":
 		m.CycleFilter()
+	case "e":
+		if err := m.ExportVisible(); err != nil {
+			m.lastNotice = ""
+			m.lastErr = err
+		}
+	case "r":
+		if err := m.ExportVisibleByRegion(); err != nil {
+			m.lastNotice = ""
+			m.lastErr = err
+		}
+	case "p":
+		if err := m.ExportVisibleByProtocol(); err != nil {
+			m.lastNotice = ""
+			m.lastErr = err
+		}
+	case "E":
+		if err := m.ExportClean(); err != nil {
+			m.lastNotice = ""
+			m.lastErr = err
+		}
 	case "enter":
 		if _, ok := m.Selected(); ok {
 			m.mode = ModeDetail
@@ -135,8 +289,14 @@ func (m BatchModel) View() string {
 	body := m.renderTable()
 	help := m.renderHelp()
 
-	if m.mode == ModeDetail {
+	if m.mode == ModeActionMenu {
+		body = m.renderActionMenu()
+	} else if m.mode == ModeInput {
+		body = m.renderActionInput()
+	} else if m.mode == ModeDetail {
 		body = m.theme.FocusedBorder.Width(m.viewportWidth()).Render(m.renderDetail())
+	} else if len(m.snapshot.Items) == 0 && m.snapshot.Summary.Total == 0 {
+		body = m.renderOnboarding()
 	}
 
 	filterRow := ""
@@ -182,27 +342,20 @@ func (m BatchModel) renderHeader() string {
 	}
 
 	left := m.theme.Title.Render(fmt.Sprintf("PureLink Batch — %d/%d (%d%%)", processed, total, pct))
-	right := m.theme.Subtitle.Render(fmt.Sprintf("source: %s  sort: %s  filter: %s",
-		source, m.sortKey, m.filterKey))
+	speed := ""
+	if m.snapshot.Summary.SpeedMbps > 0 {
+		speed = fmt.Sprintf("  speed: %.2f Mbps", m.snapshot.Summary.SpeedMbps)
+	}
+	right := m.theme.Subtitle.Render(fmt.Sprintf("source: %s  sort: %s  filter: %s%s",
+		source, m.sortKey, m.filterKey, speed))
 	gap := strings.Repeat(" ", maxInt(1, m.width-lipgloss.Width(left)-lipgloss.Width(right)))
 	return left + gap + right
 }
 
 func (m BatchModel) renderTable() string {
-	cols := []struct {
-		title string
-		width int
-	}{
-		{"Host", 26},
-		{"Port", 6},
-		{"Reach", 6},
-		{"Lat", 7},
-		{"Abuse", 6},
-		{"Purity", 14},
-	}
+	cols := tableColumns(m.visible)
 
 	var b strings.Builder
-	// header row
 	for i, c := range cols {
 		cell := padRight(c.title, c.width)
 		b.WriteString(m.theme.Header.Render(cell))
@@ -215,10 +368,10 @@ func (m BatchModel) renderTable() string {
 	if len(m.visible) == 0 {
 		message := "(no results match the current filter)"
 		if len(m.snapshot.Items) == 0 && m.snapshot.Summary.Total == 0 {
-			message = "(no endpoints loaded; run `purelink batch <file> --interactive` to inspect results)"
+			message = "(no endpoints loaded) Press i to import subscription/raw URLs, b to batch-check a file, c to check an endpoint, or ? for all actions."
 		}
 		b.WriteString(m.theme.Mute.Render(message))
-		return m.theme.Border.Width(m.viewportWidth()).Render(b.String())
+		return m.theme.Border.Width(maxInt(m.viewportWidth(), lipgloss.Width(b.String())+2)).Render(b.String())
 	}
 
 	height := maxInt(5, m.height-10)
@@ -233,36 +386,100 @@ func (m BatchModel) renderTable() string {
 
 	for i := start; i < end; i++ {
 		item := m.visible[i]
-		host := padRight(item.Endpoint.Host, cols[0].width)
-		port := padRight(strconv.Itoa(item.Endpoint.Port), cols[1].width)
-		reach := padRight(boolShort(item.Reachable), cols[2].width)
-		lat := padRight(formatLatency(item.LatencyMs, item.Reachable), cols[3].width)
-		abuse := padRight(strconv.Itoa(item.AbuseScore), cols[4].width)
-		purity := padRight(item.Purity, cols[5].width)
+		cells := tableRowCells(item)
+		padded := make([]string, len(cells))
+		for idx, cell := range cells {
+			padded[idx] = padRight(cell, cols[idx].width)
+		}
 
 		if i == m.cursor {
-			row := host + " " + port + " " + reach + " " + lat + " " + abuse + " " + purity
-			b.WriteString(m.theme.Selected.Render(row))
+			b.WriteString(m.theme.Selected.Render(strings.Join(padded, " ")))
 		} else {
-			b.WriteString(host)
+			b.WriteString(padded[0])
 			b.WriteString(" ")
-			b.WriteString(port)
+			b.WriteString(padded[1])
+			b.WriteString(" ")
+			b.WriteString(padded[2])
+			b.WriteString(" ")
+			b.WriteString(padded[3])
 			b.WriteString(" ")
 			if item.Reachable {
-				b.WriteString(m.theme.Good.Render(reach))
+				b.WriteString(m.theme.Good.Render(padded[4]))
 			} else {
-				b.WriteString(m.theme.Bad.Render(reach))
+				b.WriteString(m.theme.Bad.Render(padded[4]))
 			}
 			b.WriteString(" ")
-			b.WriteString(lat)
+			b.WriteString(padded[5])
 			b.WriteString(" ")
-			b.WriteString(m.theme.AbuseStyle(item.AbuseScore).Render(abuse))
+			abuseStyle := m.theme.AbuseStyle(item.AbuseScore)
+			if abuseScoreUnknown(item.AbuseScore, item.Purity) {
+				abuseStyle = m.theme.Mute
+			}
+			b.WriteString(abuseStyle.Render(padded[6]))
 			b.WriteString(" ")
-			b.WriteString(m.theme.PurityStyle(item.Purity).Render(purity))
+			b.WriteString(m.theme.PurityStyle(item.Purity).Render(padded[7]))
 		}
 		b.WriteString("\n")
 	}
-	return m.theme.Border.Width(m.viewportWidth()).Render(b.String())
+	return m.theme.Border.Width(maxInt(m.viewportWidth(), lipgloss.Width(b.String())+2)).Render(b.String())
+}
+
+type tableColumn struct {
+	title string
+	width int
+}
+
+func tableColumns(items []engine.BatchItem) []tableColumn {
+	cols := []tableColumn{
+		{title: "Host"},
+		{title: "Port"},
+		{title: "Protocol"},
+		{title: "Region"},
+		{title: "Reachable"},
+		{title: "Latency"},
+		{title: "Abuse Score"},
+		{title: "Purity"},
+	}
+	for i := range cols {
+		cols[i].width = lipgloss.Width(cols[i].title)
+	}
+	for _, item := range items {
+		cells := tableRowCells(item)
+		for i, cell := range cells {
+			cols[i].width = maxInt(cols[i].width, lipgloss.Width(cell))
+		}
+	}
+	return cols
+}
+
+func tableRowCells(item engine.BatchItem) []string {
+	return []string{
+		item.Endpoint.Host,
+		strconv.Itoa(item.Endpoint.Port),
+		displayValue(item.Protocol),
+		displayRegion(item),
+		boolShort(item.Reachable),
+		formatLatency(item.LatencyMs, item.Reachable),
+		formatAbuseScore(item.AbuseScore, item.Purity),
+		item.Purity,
+	}
+}
+
+func displayRegion(item engine.BatchItem) string {
+	if item.Country != "" {
+		return item.Country
+	}
+	if item.CountryCode != "" {
+		return item.CountryCode
+	}
+	return "—"
+}
+
+func displayValue(value string) string {
+	if value == "" {
+		return "—"
+	}
+	return value
 }
 
 func boolShort(v bool) string {
@@ -279,16 +496,25 @@ func formatLatency(ms int64, reachable bool) string {
 	return strconv.FormatInt(ms, 10) + "ms"
 }
 
-// padRight pads s with spaces on the right up to width, truncating with an
-// ellipsis if longer.
-func padRight(s string, width int) string {
-	if len(s) > width {
-		if width <= 1 {
-			return s[:width]
-		}
-		return s[:width-1] + "…"
+func formatAbuseScore(score int, purity string) string {
+	if abuseScoreUnknown(score, purity) {
+		return "—"
 	}
-	return s + strings.Repeat(" ", width-len(s))
+	return strconv.Itoa(score)
+}
+
+func abuseScoreUnknown(score int, purity string) bool {
+	return score == 0 && purity == "unknown"
+}
+
+// padRight pads s with spaces on the right up to width. It never truncates;
+// callers compute dynamic column widths from the full visible values.
+func padRight(s string, width int) string {
+	pad := width - lipgloss.Width(s)
+	if pad <= 0 {
+		return s
+	}
+	return s + strings.Repeat(" ", pad)
 }
 
 func maxInt(a, b int) int {
@@ -298,17 +524,57 @@ func maxInt(a, b int) int {
 	return b
 }
 
+func (m BatchModel) shouldAutoFollowTail() bool {
+	if len(m.visible) == 0 {
+		return true
+	}
+	return m.cursor >= len(m.visible)-2
+}
+
+func (m BatchModel) nextActionStreamCmd() tea.Cmd {
+	if m.activeActionStream == nil {
+		return nil
+	}
+	return waitForActionStream(m.activeActionStream)
+}
+
+func waitForActionStream(ch <-chan tea.Msg) tea.Cmd {
+	if ch == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		msg, ok := <-ch
+		if !ok {
+			return actionStreamClosedMsg{}
+		}
+		return msg
+	}
+}
+
 func (m BatchModel) renderHelp() string {
 	hints := []string{
 		"q quit",
 		"↑↓ nav",
 		"enter detail",
 		"/ search",
+		"? actions",
+		"i import",
+		"c check",
 		"s sort",
 		"f filter",
+		"e export listed",
+		"r by region",
+		"p by protocol",
+		"E export clean",
 	}
 	if m.mode == ModeFilter {
 		hints = []string{"esc cancel", "enter apply"}
+	}
+	if m.mode == ModeInput {
+		hints = []string{"enter run", "esc cancel"}
+	}
+	if m.mode == ModeActionMenu {
+		hints = []string{"i import", "b batch", "c check", "R report", "d dedupe", "T speed", "esc close"}
 	}
 	if m.mode == ModeDetail {
 		hints = []string{"esc/enter close", "↑↓ scroll"}
@@ -316,6 +582,8 @@ func (m BatchModel) renderHelp() string {
 	help := strings.Join(hints, "  ")
 	if m.lastErr != nil {
 		help = m.theme.Bad.Render("error: "+m.lastErr.Error()) + "  " + help
+	} else if m.lastNotice != "" {
+		help = m.theme.Good.Render(m.lastNotice) + "  " + help
 	}
 	return m.theme.Help.Render(help)
 }
@@ -329,13 +597,31 @@ func (m BatchModel) renderDetail() string {
 	fmt.Fprintf(&b, "%s\n", m.theme.Title.Render(fmt.Sprintf("Detail: %s", item.Endpoint.String())))
 	fmt.Fprintf(&b, "  Host:       %s\n", item.Endpoint.Host)
 	fmt.Fprintf(&b, "  Port:       %d\n", item.Endpoint.Port)
+	fmt.Fprintf(&b, "  Protocol:   %s\n", displayValue(item.Protocol))
+	fmt.Fprintf(&b, "  Region:     %s\n", displayRegion(item))
 	fmt.Fprintf(&b, "  Reachable:  %s\n", boolLabel(item.Reachable, m.theme))
 	fmt.Fprintf(&b, "  Latency:    %dms\n", item.LatencyMs)
-	fmt.Fprintf(&b, "  Abuse:      %s\n", m.theme.AbuseStyle(item.AbuseScore).Render(strconv.Itoa(item.AbuseScore)))
+	abuseStyle := m.theme.AbuseStyle(item.AbuseScore)
+	if abuseScoreUnknown(item.AbuseScore, item.Purity) {
+		abuseStyle = m.theme.Mute
+	}
+	fmt.Fprintf(&b, "  Abuse:      %s\n", abuseStyle.Render(formatAbuseScore(item.AbuseScore, item.Purity)))
 	fmt.Fprintf(&b, "  Purity:     %s\n", m.theme.PurityStyle(item.Purity).Render(item.Purity))
+	if item.ProviderTotal > 0 {
+		fmt.Fprintf(&b, "  Providers:  %d/%d successful\n", item.ProviderSuccesses, item.ProviderTotal)
+	}
+	if item.SpeedMbps > 0 {
+		fmt.Fprintf(&b, "  Speed:      %.2f Mbps\n", item.SpeedMbps)
+	}
 	if len(item.ProviderErrs) > 0 {
 		b.WriteString("\n")
-		b.WriteString(m.theme.Subtitle.Render("Provider Errors\n"))
+		if item.ProviderSuccesses > 0 {
+			b.WriteString(m.theme.Subtitle.Render("Provider Warnings\n"))
+			b.WriteString("  Verdict used the successful provider responses below; unavailable providers were not averaged in.\n")
+		} else {
+			b.WriteString(m.theme.Subtitle.Render("Provider Errors\n"))
+			b.WriteString("  No provider returned usable data, so abuse/purity should be treated as unknown.\n")
+		}
 		for _, msg := range item.ProviderErrs {
 			fmt.Fprintf(&b, "  - %s\n", msg)
 		}

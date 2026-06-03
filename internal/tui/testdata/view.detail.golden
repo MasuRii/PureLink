@@ -1,0 +1,12 @@
+PureLink Batch — 5/5 (100%)                                              source: endpoints.txt  sort: abuse  filter: all
+Detail: ex2.example.com:443                                                                                             
+  Host:       ex2.example.com                                                                                           
+  Port:       443                                                                                                       
+  Protocol:   —                                                                                                         
+  Region:     —                                                                                                         
+  Reachable:  true                                                                                                      
+  Latency:    45ms                                                                                                      
+  Abuse:      67                                                                                                        
+  Purity:     vpn_detected                                                                                              
+                                                                                                                        
+esc/enter close  ↑↓ scroll                                                                                              

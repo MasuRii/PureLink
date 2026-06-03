@@ -12,6 +12,9 @@ type Theme struct {
 
 	Title    lipgloss.Style
 	Subtitle lipgloss.Style
+	BrandA   lipgloss.Style
+	BrandB   lipgloss.Style
+	BrandC   lipgloss.Style
 
 	Header   lipgloss.Style
 	Cell     lipgloss.Style
@@ -38,22 +41,25 @@ type Theme struct {
 // backgrounds shipped by GNOME, Windows Terminal, iTerm2, and Alacritty.
 func DefaultTheme() Theme {
 	return Theme{
-		Title:         lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4")),
-		Subtitle:      lipgloss.NewStyle().Foreground(lipgloss.Color("#A78BFA")),
-		Header:        lipgloss.NewStyle().Bold(true).Padding(0, 1).Foreground(lipgloss.Color("#FAFAFA")).Background(lipgloss.Color("#3B3486")),
+		Title:         lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#22C78A")),
+		Subtitle:      lipgloss.NewStyle().Foreground(lipgloss.Color("#5ED4A7")),
+		BrandA:        lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#22C78A")),
+		BrandB:        lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#3DD68C")),
+		BrandC:        lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#5ED4A7")),
+		Header:        lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FAFAFA")).Background(lipgloss.Color("#1B4332")),
 		Cell:          lipgloss.NewStyle().Padding(0, 1),
-		Selected:      lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Background(lipgloss.Color("#7D56F4")),
+		Selected:      lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Background(lipgloss.Color("#22C78A")),
 		Good:          lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")),
 		Warn:          lipgloss.NewStyle().Foreground(lipgloss.Color("#F4D03F")),
 		Bad:           lipgloss.NewStyle().Foreground(lipgloss.Color("#FF4672")),
 		Mute:          lipgloss.NewStyle().Foreground(lipgloss.Color("#626262")),
 		Help:          lipgloss.NewStyle().Foreground(lipgloss.Color("#9A9A9A")),
-		Border:        lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#3B3486")).Padding(0, 1),
-		FocusedBorder: lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#7D56F4")).Padding(0, 1),
+		Border:        lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#1B4332")).Padding(0, 1),
+		FocusedBorder: lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#22C78A")).Padding(0, 1),
 		Filter:        lipgloss.NewStyle().Foreground(lipgloss.Color("#F4D03F")),
 		Detail:        lipgloss.NewStyle().Padding(0, 1),
 		StatusOK:      lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true),
-		Spinner:       lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")),
+		Spinner:       lipgloss.NewStyle().Foreground(lipgloss.Color("#22C78A")),
 	}
 }
 
@@ -67,6 +73,9 @@ func NoColorTheme() Theme {
 		NoColor:       true,
 		Title:         bold,
 		Subtitle:      pass,
+		BrandA:        bold,
+		BrandB:        bold,
+		BrandC:        bold,
 		Header:        bold,
 		Cell:          pass,
 		Selected:      bold,

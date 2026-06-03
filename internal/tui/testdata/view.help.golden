@@ -1,0 +1,24 @@
+PureLink Batch — 5/5 (100%)                                              source: endpoints.txt  sort: abuse  filter: all
+ ███████████                                █████        ███             █████                                          
+▒▒███▒▒▒▒▒███                              ▒▒███        ▒▒▒             ▒▒███                                           
+ ▒███    ▒███ █████ ████ ████████   ██████  ▒███        ████  ████████   ▒███ █████                                     
+ ▒██████████ ▒▒███ ▒███ ▒▒███▒▒███ ███▒▒███ ▒███       ▒▒███ ▒▒███▒▒███  ▒███▒▒███                                      
+ ▒███▒▒▒▒▒▒   ▒███ ▒███  ▒███ ▒▒▒ ▒███████  ▒███        ▒███  ▒███ ▒███  ▒██████▒                                       
+ ▒███         ▒███ ▒███  ▒███     ▒███▒▒▒   ▒███      █ ▒███  ▒███ ▒███  ▒███▒▒███                                      
+ █████        ▒▒████████ █████    ▒▒██████  ███████████ █████ ████ █████ ████ █████                                     
+▒▒▒▒▒          ▒▒▒▒▒▒▒▒ ▒▒▒▒▒      ▒▒▒▒▒▒  ▒▒▒▒▒▒▒▒▒▒▒ ▒▒▒▒▒ ▒▒▒▒ ▒▒▒▒▒ ▒▒▒▒ ▒▒▒▒▒                                      
+                                                                                                                        
+PureLink actions                                                                                                        
+                                                                                                                        
+  i  import HTTP(S) subscription URLs / pasted raw links                                                                
+  b  run batch file                                                                                                     
+  l  import link file                                                                                                   
+  v  import v2rayN folder                                                                                               
+  c  check endpoint                                                                                                     
+  R  report endpoint                                                                                                    
+  d  dedupe files                                                                                                       
+  D  dedupe current loaded list                                                                                         
+  T  speed test                                                                                                         
+  esc close                                                                                                             
+                                                                                                                        
+i import  b batch  c check  R report  d dedupe  T speed  esc close                                                      
