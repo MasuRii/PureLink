@@ -50,11 +50,6 @@ changelog:
       - '^test:'
       - '^chore:'
 
-sboms:
-  - artifacts: archive
-  - id: source
-    artifacts: source
-
 homebrew_casks:
   - name: purelink
     repository:
@@ -93,7 +88,7 @@ dockers_v2:
     platforms:
       - linux/amd64
       - linux/arm64
-    sbom: true
+    sbom: false
     annotations:
       "org.opencontainers.image.description": "CLI toolkit for vetting endpoints, IPs, and domains"
       "org.opencontainers.image.created": "{{.Date}}"
