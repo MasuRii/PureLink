@@ -334,7 +334,7 @@ func splitExportDirectory(path, suffix string) string {
 }
 
 func writeEndpointExport(path string, items []engine.BatchItem) error {
-	f, err := os.Create(path)
+	f, err := os.Create(path) // #nosec G304 -- TUI export path is intentionally user-controlled.
 	if err != nil {
 		return err
 	}
