@@ -76,20 +76,6 @@ scoops:
     homepage: "https://github.com/MasuRii/PureLink"
     skip_upload: auto
 
-dockers_v2:
-  - ids:
-      - purelink
-    dockerfile: Dockerfile
-    images:
-      - "ghcr.io/masurii/purelink"
-    tags:
-      - "{{ .Version }}"
-      - "latest"
-    platforms:
-      - linux/amd64
-      - linux/arm64
-    sbom: false
-
 winget:
   - name: purelink
     publisher: MasuRii
