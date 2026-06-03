@@ -55,3 +55,6 @@ __debug_bin*
 
 # Build artifacts
 vendor/
+
+# Generated reports/docs artifacts
+/docs/reports/
