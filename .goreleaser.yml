@@ -50,6 +50,53 @@ changelog:
       - '^test:'
       - '^chore:'
 
+homebrew_casks:
+  - name: purelink
+    repository:
+      owner: MasuRii
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/MasuRii/PureLink"
+    description: "CLI toolkit for vetting endpoints, IPs, and domains"
+    license: MIT
+    skip_upload: auto
+    binaries:
+      - purelink
+
+scoops:
+  - name: purelink
+    repository:
+      owner: MasuRii
+      name: scoop-bucket
+      branch: main
+      token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
+    description: "CLI toolkit for vetting endpoints, IPs, and domains"
+    license: MIT
+    homepage: "https://github.com/MasuRii/PureLink"
+    skip_upload: auto
+
+dockers_v2:
+  - ids:
+      - purelink
+    dockerfile: Dockerfile
+    images:
+      - "ghcr.io/masurii/purelink"
+    tags:
+      - "{{ .Version }}"
+      - "latest"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    sbom: false
+    annotations:
+      "org.opencontainers.image.description": "CLI toolkit for vetting endpoints, IPs, and domains"
+      "org.opencontainers.image.created": "{{.Date}}"
+      "org.opencontainers.image.name": "{{.ProjectName}}"
+      "org.opencontainers.image.revision": "{{.FullCommit}}"
+      "org.opencontainers.image.version": "{{.Version}}"
+      "org.opencontainers.image.source": "{{.GitURL}}"
+
 winget:
   - name: purelink
     publisher: MasuRii
@@ -60,7 +107,7 @@ winget:
     short_description: "CLI toolkit for vetting endpoints, IPs, and domains"
     package_identifier: MasuRii.PureLink
     url_template: "https://github.com/MasuRii/PureLink/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-    skip_upload: true
+    skip_upload: auto
     release_notes: "{{.Changelog}}"
     tags:
       - golang

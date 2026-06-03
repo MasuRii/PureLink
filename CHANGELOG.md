@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-06-03
+
+### Restored
+
+- **Homebrew**: Restored `homebrew_casks` publisher targeting `MasuRii/homebrew-tap` using `TAP_GITHUB_TOKEN`.
+- **Scoop**: Restored `scoops` publisher targeting `MasuRii/scoop-bucket` using `SCOOP_BUCKET_GITHUB_TOKEN`.
+- **Docker / OCI Images**: Restored `dockers_v2` multi-platform image builds (linux/amd64 + linux/arm64) pushed to `ghcr.io/masurii/purelink`, with Buildx/QEMU setup in CI.
+- **WinGet**: Changed `skip_upload` from `true` to `auto` to enable draft-PR automation when `WINGET_GITHUB_TOKEN` is present.
+
+### Changed
+
+- **npm package**: Bumped npm wrapper metadata to `1.1.1`.
+- **Release CI**: Added `docker/setup-qemu-action@v3` and `docker/setup-buildx-action@v3` steps for reliable multi-platform Docker builds.
+- **SBOMs**: Kept archive and source SBOMs disabled pending syft compatibility verification with GoReleaser v2.
+
 ## [1.1.0] - 2026-06-03
 
 ### Added
