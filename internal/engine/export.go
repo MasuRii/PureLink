@@ -109,7 +109,7 @@ func WriteSplitExport(directory string, items []BatchItem, groupBy string, forma
 	if directory == "" {
 		directory = "PureLink-export"
 	}
-	if err := os.MkdirAll(directory, 0o755); err != nil {
+	if err := os.MkdirAll(directory, 0o750); err != nil {
 		return SplitExportResult{}, err
 	}
 
